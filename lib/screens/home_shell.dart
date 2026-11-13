@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/theme_controller.dart';
+import 'browse_screen.dart';
 import 'settings_screen.dart';
 
 class HomeShell extends StatefulWidget {
@@ -51,11 +52,11 @@ class _HomeShellState extends State<HomeShell> {
       ),
       body: IndexedStack(
         index: _index,
-        children: const [
-          _PlaceholderScreen(icon: Icons.home_outlined, label: 'Home'),
-          _PlaceholderScreen(icon: Icons.folder_outlined, label: 'Browse'),
-          _PlaceholderScreen(icon: Icons.star_outline, label: 'Starred'),
-          _PlaceholderScreen(icon: Icons.pie_chart_outline, label: 'Storage'),
+        children: [
+          const _PlaceholderScreen(icon: Icons.home_outlined, label: 'Home'),
+          BrowseScreen(active: _index == 1),
+          const _PlaceholderScreen(icon: Icons.star_outline, label: 'Starred'),
+          const _PlaceholderScreen(icon: Icons.pie_chart_outline, label: 'Storage'),
         ],
       ),
       bottomNavigationBar: NavigationBar(
