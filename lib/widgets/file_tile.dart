@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/file_item.dart';
+import 'file_thumb.dart';
 
 class FileTile extends StatelessWidget {
   const FileTile({
@@ -23,6 +24,38 @@ class FileTile extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final (icon, color) = _iconFor(item.kind, scheme);
 
+    final iconBox = Container(
+      width: 42,
+      height: 42,
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Icon(icon, color: color, size: 22),
+    );
+
+    final Widget leading;
+    if (selected) {
+      leading = Container(
+        key: const ValueKey('selected'),
+        width: 42,
+        height: 42,
+        decoration: BoxDecoration(
+          color: scheme.primary,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Icon(Icons.check, color: scheme.onPrimary, size: 22),
+      );
+    } else if (item.kind == FileKind.image) {
+      leading = FileThumb(
+        key: const ValueKey('thumb'),
+        path: item.path,
+        fallback: iconBox,
+      );
+    } else {
+      leading = KeyedSubtree(key: const ValueKey('icon'), child: iconBox);
+    }
+
     return ListTile(
       onTap: onTap,
       onLongPress: onLongPress,
@@ -31,27 +64,7 @@ class FileTile extends StatelessWidget {
       selectedTileColor: scheme.primaryContainer.withValues(alpha: 0.7),
       leading: AnimatedSwitcher(
         duration: const Duration(milliseconds: 150),
-        child: selected
-            ? Container(
-                key: const ValueKey('selected'),
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: scheme.primary,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(Icons.check, color: scheme.onPrimary, size: 22),
-              )
-            : Container(
-                key: const ValueKey('normal'),
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(icon, color: color, size: 22),
-              ),
+        child: leading,
       ),
       title: Text(item.name, maxLines: 1, overflow: TextOverflow.ellipsis),
       subtitle: Text(

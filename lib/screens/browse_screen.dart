@@ -10,6 +10,7 @@ import '../services/convert_service.dart';
 import '../services/file_service.dart';
 import '../widgets/file_tile.dart';
 import 'convert_images_screen.dart';
+import 'images_to_pdf_screen.dart';
 
 class BrowseScreen extends StatefulWidget {
   const BrowseScreen({super.key, required this.active, this.jumpTo});
@@ -255,8 +256,36 @@ class _BrowseScreenState extends State<BrowseScreen> with WidgetsBindingObserver
   Future<void> _convert() async {
     final items = _selectedItems;
     if (items.isEmpty) return;
+
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.transform),
+              title: const Text('Convert to PNG or JPG'),
+              onTap: () => Navigator.pop(context, 'image'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.picture_as_pdf_outlined),
+              title: Text(items.length == 1 ? 'Make a PDF' : 'Combine into one PDF'),
+              onTap: () => Navigator.pop(context, 'pdf'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (choice == null || !mounted) return;
+
     await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => ConvertImagesScreen(files: items)),
+      MaterialPageRoute(
+        builder: (_) => choice == 'pdf'
+            ? ImagesToPdfScreen(files: items)
+            : ConvertImagesScreen(files: items),
+      ),
     );
     if (!mounted) return;
     setState(_selected.clear);

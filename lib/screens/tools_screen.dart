@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/file_item.dart';
 import '../services/convert_service.dart';
 import 'convert_images_screen.dart';
+import 'images_to_pdf_screen.dart';
 import 'pick_files_screen.dart';
 
 class ToolsScreen extends StatelessWidget {
@@ -24,6 +25,22 @@ class ToolsScreen extends StatelessWidget {
     );
   }
 
+  Future<void> _imagesToPdf(BuildContext context) async {
+    final picked = await Navigator.of(context).push<List<FileItem>>(
+      MaterialPageRoute(
+        builder: (_) => const PickFilesScreen(
+          title: 'Choose images',
+          accepts: ConvertService.canConvert,
+        ),
+      ),
+    );
+    if (picked == null || picked.isEmpty || !context.mounted) return;
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => ImagesToPdfScreen(files: picked)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return GridView.count(
@@ -39,10 +56,11 @@ class ToolsScreen extends StatelessWidget {
           subtitle: 'PNG and JPG',
           onTap: () => _convertImages(context),
         ),
-        const _ToolCard(
+        _ToolCard(
           icon: Icons.picture_as_pdf_outlined,
           title: 'Images to PDF',
-          subtitle: '',
+          subtitle: 'Combine images',
+          onTap: () => _imagesToPdf(context),
         ),
         const _ToolCard(
           icon: Icons.folder_zip_outlined,
