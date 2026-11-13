@@ -9,12 +9,14 @@ class FileTile extends StatelessWidget {
     required this.onTap,
     this.onLongPress,
     this.selected = false,
+    this.trailing,
   });
 
   final FileItem item;
   final VoidCallback onTap;
   final VoidCallback? onLongPress;
   final bool selected;
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -25,6 +27,7 @@ class FileTile extends StatelessWidget {
       onTap: onTap,
       onLongPress: onLongPress,
       selected: selected,
+      trailing: trailing,
       selectedTileColor: scheme.primaryContainer.withValues(alpha: 0.7),
       leading: AnimatedSwitcher(
         duration: const Duration(milliseconds: 150),

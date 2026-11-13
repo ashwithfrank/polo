@@ -6,15 +6,20 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../models/file_item.dart';
+import '../services/convert_service.dart';
 import '../services/file_service.dart';
 import '../widgets/file_tile.dart';
+import 'convert_images_screen.dart';
 
 class BrowseScreen extends StatefulWidget {
-  const BrowseScreen({super.key, required this.active});
+  const BrowseScreen({super.key, required this.active, this.jumpTo});
 
   /// True while this tab is the visible one. Used so the system back button
   /// only walks up folders when Browse is on screen.
   final bool active;
+
+  /// Set a folder path on this notifier to make Browse open that folder.
+  final ValueNotifier<String?>? jumpTo;
 
   @override
   State<BrowseScreen> createState() => _BrowseScreenState();
@@ -45,14 +50,44 @@ class _BrowseScreenState extends State<BrowseScreen> with WidgetsBindingObserver
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    widget.jumpTo?.addListener(_onJump);
     _checkPermission();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    widget.jumpTo?.removeListener(_onJump);
     _crumbScroll.dispose();
     super.dispose();
+  }
+
+  void _onJump() {
+    final path = widget.jumpTo?.value;
+    if (path == null) return;
+    widget.jumpTo!.value = null;
+
+    if (_granted != true) {
+      // Opened once access has been granted.
+      _path = path;
+      return;
+    }
+    if (!Directory(path).existsSync()) {
+      _toast("That folder doesn't exist on this device");
+      return;
+    }
+    _selected.clear();
+    _path = path;
+    _load(path);
+  }
+
+  @override
+  void didUpdateWidget(BrowseScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Pick up files created elsewhere, for example by a conversion in Tools.
+    if (widget.active && !oldWidget.active && _granted == true) {
+      _load(_path, showSpinner: false);
+    }
   }
 
   @override
@@ -215,6 +250,17 @@ class _BrowseScreenState extends State<BrowseScreen> with WidgetsBindingObserver
     await SharePlus.instance.share(
       ShareParams(files: [for (final f in files) XFile(f.path)]),
     );
+  }
+
+  Future<void> _convert() async {
+    final items = _selectedItems;
+    if (items.isEmpty) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => ConvertImagesScreen(files: items)),
+    );
+    if (!mounted) return;
+    setState(_selected.clear);
+    await _load(_path, showSpinner: false);
   }
 
   Future<void> _rename() async {
@@ -508,6 +554,8 @@ class _BrowseScreenState extends State<BrowseScreen> with WidgetsBindingObserver
               onTap: () => _stageClipboard(move: true),
             ),
             _ActionButton(icon: Icons.share_outlined, label: 'Share', onTap: _share),
+            if (_selectedItems.isNotEmpty && _selectedItems.every(ConvertService.canConvert))
+              _ActionButton(icon: Icons.transform, label: 'Convert', onTap: _convert),
             if (_selected.length == 1)
               _ActionButton(
                 icon: Icons.drive_file_rename_outline,

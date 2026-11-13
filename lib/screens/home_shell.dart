@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../services/storage_controller.dart';
 import '../theme/theme_controller.dart';
 import 'browse_screen.dart';
+import 'home_screen.dart';
 import 'settings_screen.dart';
+import 'storage_screen.dart';
+import 'tools_screen.dart';
 
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key, required this.themeController});
@@ -13,10 +17,47 @@ class HomeShell extends StatefulWidget {
   State<HomeShell> createState() => _HomeShellState();
 }
 
-class _HomeShellState extends State<HomeShell> {
+class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
+  final _storage = StorageController();
+  final _jump = ValueNotifier<String?>(null);
   int _index = 0;
 
-  static const _titles = ['Polo', 'Browse', 'Starred', 'Storage'];
+  static const _titles = ['Polo', 'Browse', 'Tools', 'Storage'];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _storage.load();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _storage.dispose();
+    _jump.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // The user may have just granted access in system settings.
+    if (state == AppLifecycleState.resumed && _storage.needsAccess) {
+      _storage.load();
+    }
+  }
+
+  void _select(int i) {
+    // Files may have changed while the user was in Browse or Tools.
+    if (_index == 1 || _index == 2) _storage.markStale();
+    setState(() => _index = i);
+    if (i == 0 || i == 3) _storage.loadIfStale();
+  }
+
+  void _openFolder(String path) {
+    _select(1);
+    _jump.value = path;
+  }
 
   void _toggleTheme(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -53,15 +94,19 @@ class _HomeShellState extends State<HomeShell> {
       body: IndexedStack(
         index: _index,
         children: [
-          const _PlaceholderScreen(icon: Icons.home_outlined, label: 'Home'),
-          BrowseScreen(active: _index == 1),
-          const _PlaceholderScreen(icon: Icons.star_outline, label: 'Starred'),
-          const _PlaceholderScreen(icon: Icons.pie_chart_outline, label: 'Storage'),
+          HomeScreen(
+            controller: _storage,
+            onOpenFolder: _openFolder,
+            onOpenStorage: () => _select(3),
+          ),
+          BrowseScreen(active: _index == 1, jumpTo: _jump),
+          const ToolsScreen(),
+          StorageScreen(controller: _storage),
         ],
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
-        onDestinationSelected: (i) => setState(() => _index = i),
+        onDestinationSelected: _select,
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.home_outlined),
@@ -74,37 +119,15 @@ class _HomeShellState extends State<HomeShell> {
             label: 'Browse',
           ),
           NavigationDestination(
-            icon: Icon(Icons.star_outline),
-            selectedIcon: Icon(Icons.star),
-            label: 'Starred',
+            icon: Icon(Icons.handyman_outlined),
+            selectedIcon: Icon(Icons.handyman),
+            label: 'Tools',
           ),
           NavigationDestination(
             icon: Icon(Icons.pie_chart_outline),
             selectedIcon: Icon(Icons.pie_chart),
             label: 'Storage',
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PlaceholderScreen extends StatelessWidget {
-  const _PlaceholderScreen({required this.icon, required this.label});
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 56, color: scheme.primary),
-          const SizedBox(height: 12),
-          Text(label, style: Theme.of(context).textTheme.titleMedium),
         ],
       ),
     );
