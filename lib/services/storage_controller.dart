@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 
+import '../models/file_item.dart';
+import '../models/storage_category.dart';
 import 'storage_access.dart';
 import 'storage_info.dart';
 import 'storage_scanner.dart';
@@ -55,6 +57,24 @@ class StorageController extends ChangeNotifier {
   Future<void> requestAccess() async {
     await StorageAccess.request();
     await load();
+  }
+
+  /// Removes a deleted file from the current results right away, so lists
+  /// update without waiting for a full rescan.
+  void forget(FileItem item) {
+    final s = scan;
+    if (s == null) return;
+    s.index.removeWhere((i) => i.path == item.path);
+    s.recent.removeWhere((i) => i.path == item.path);
+    s.largest.removeWhere((i) => i.path == item.path);
+
+    final category = StorageCategory.of(item.kind);
+    s.bytes[category] = (s.bytes[category] ?? 0) - item.size;
+    s.counts[category] = (s.counts[category] ?? 0) - 1;
+
+    final i = info;
+    if (i != null) info = StorageInfo(total: i.total, free: i.free + item.size);
+    _notify();
   }
 
   void _notify() {

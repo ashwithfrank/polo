@@ -2,7 +2,7 @@
 
 A fast, clean file manager for Android with built-in tools, made with Flutter. Polo uses a warm orange and cream design with a light and dark theme.
 
-> Status: early development. Home, Browse, Tools and Storage all work. More tools are on the way.
+> Status: early development (v0.4.0). Home, Browse, Search, Tools, Trash and Storage all work. More tools are on the way.
 
 ## Features
 
@@ -19,14 +19,33 @@ A fast, clean file manager for Android with built-in tools, made with Flutter. P
 - Create new folders
 - Name conflicts never overwrite: pasting `photo.jpg` next to an existing one gives `photo (1).jpg`
 
+**Browse**
+- Browse internal storage with a tappable breadcrumb path
+- List or grid view (saved), with real picture previews for images
+- Sort by name, date or size, and show or hide hidden files
+- Multi-select with long-press, then copy, move, share, delete and a More menu (rename, details, compress to ZIP, extract, convert, make PDF)
+- Create new folders
+- Name conflicts never overwrite: pasting `photo.jpg` next to an existing one gives `photo (1).jpg`
+
+**Search and categories**
+- Search every file and folder by name, with filter chips
+- Tap a category on Home or Storage to see all images, videos, audio, documents, archives or apps in one list
+
 **Tools**
 - Image converter: PNG and JPG, with adjustable JPG quality
-- Convert from the Tools tab, or select images in Browse and tap Convert
-- Originals are never touched: the converted file is saved next to them
+- Images to PDF: reorder pages, A4 or fit-to-image, quality slider
+- Zip and unzip: compress files and folders, extract `.zip` files into their own folder
+- Duplicate finder: finds identical files by content and moves the extra copies to trash
+- Originals are never touched: results are saved next to them
+
+**Trash and details**
+- Deleted files go to a trash you can restore from (Settings, then Trash), with Undo in Browse
+- Items are removed for good after 30 days
+- Details dialog for any file or folder: type, location, size and dates
 
 **Storage**
 - Usage bar split by file type, with file counts and sizes
-- Largest files list with a delete button for quick cleanup
+- Largest files list for quick cleanup
 
 **Design**
 - Orange and cream light theme and warm charcoal dark theme (Material 3)
@@ -34,11 +53,8 @@ A fast, clean file manager for Android with built-in tools, made with Flutter. P
 - Custom app icon (themed icon on Android 13+) and a splash screen for both themes
 
 **Planned**
-- More tools: images to PDF, zip and unzip, video to audio
-- Search
-- Duplicate file finder
-- List and grid view toggle
-- SD card support
+- Video to audio
+- WebP output for the image converter
 
 ## App details
 
@@ -64,11 +80,16 @@ lib/
     storage_category.dart        File type groups used by the Storage screen
   services/
     file_service.dart            Listing, copy, move, rename, delete, new folder
-    convert_service.dart         Image conversion (runs in a background isolate)
-    storage_scanner.dart         Scans storage for the breakdown, largest and recent files
-    storage_controller.dart      Shares scan results between Home and Storage
+    trash_service.dart           Trash: move, restore, delete forever, 30-day clean-up
+    archive_service.dart         Create and extract ZIP files
+    convert_service.dart         Image conversion (background isolate)
+    pdf_service.dart             Images to PDF (background isolate)
+    duplicate_finder.dart        Finds identical files by size and content hash
+    storage_scanner.dart         Scans storage for the breakdown, largest, recent files and search index
+    storage_controller.dart      Shares scan results between screens
     storage_info.dart            Total and free space, read through a platform channel
     storage_access.dart          Storage permission helper
+    settings_controller.dart     Saved sort, hidden files and list/grid choice
   theme/
     app_theme.dart               Light and dark ThemeData
     theme_controller.dart        Theme mode state, saved with shared_preferences
@@ -76,12 +97,18 @@ lib/
     home_shell.dart              Navigation bar and top-level screens
     home_screen.dart             Storage card, quick access, recent files
     browse_screen.dart           Browsing, selection and file actions
-    tools_screen.dart            Tool cards
+    search_screen.dart           Search with filters
+    category_screen.dart         All files of one type
+    tools_screen.dart            Tool cards and the zip menu
     convert_images_screen.dart   Image converter
+    images_to_pdf_screen.dart    Images to PDF
+    duplicates_screen.dart       Duplicate finder
+    trash_screen.dart            Trash
     pick_files_screen.dart       In-app file picker used by tools
     storage_screen.dart          Breakdown and largest files
-    settings_screen.dart         Theme selector
-  widgets/                       File tile, message view, open-file helper
+    settings_screen.dart         Theme, browsing options, trash, about
+    about_screen.dart            Version, licenses and links
+  widgets/                       File tile, grid tile, dialogs, details, open-file helper
   utils/format.dart              Size formatting
 assets/icon/                     App icon and splash images
 android/.../MainActivity.kt      Storage info platform channel
@@ -117,11 +144,15 @@ Then run `flutter clean` and build again. Alternatively, set the `PUB_CACHE` env
 
 ## Dependencies
 
-- [shared_preferences](https://pub.dev/packages/shared_preferences): saves the theme choice
+- [shared_preferences](https://pub.dev/packages/shared_preferences): saves theme and browsing choices
 - [permission_handler](https://pub.dev/packages/permission_handler): storage access
 - [open_filex](https://pub.dev/packages/open_filex): opens files in other apps
 - [share_plus](https://pub.dev/packages/share_plus): shares files
 - [image](https://pub.dev/packages/image): image conversion
+- [pdf](https://pub.dev/packages/pdf): builds PDFs
+- [archive](https://pub.dev/packages/archive): ZIP files
+- [crypto](https://pub.dev/packages/crypto): file hashing for the duplicate finder
+- [package_info_plus](https://pub.dev/packages/package_info_plus): app version in About
 - [flutter_launcher_icons](https://pub.dev/packages/flutter_launcher_icons) and [flutter_native_splash](https://pub.dev/packages/flutter_native_splash) (dev): icon and splash generation
 
 ## Roadmap
@@ -131,10 +162,12 @@ Then run `flutter clean` and build again. Alternatively, set the `PUB_CACHE` env
 3. File actions: copy, move, rename, delete, share (done)
 4. App icon and splash screen (done)
 5. Home and Storage screens (done)
-6. Tools: image converter (done)
-7. More tools: images to PDF, zip and unzip, video to audio
-8. Search, duplicate finder, grid view and polish
+6. Tools: image converter, images to PDF, zip and unzip (done)
+7. Search, categories, thumbnails (done)
+8. Trash, file details, duplicate finder, grid view (done)
+9. Video to audio, WebP output
+10. Release prep: signing, store listing
 
 ## License
 
-No license has been chosen yet. Add a `LICENSE` file before sharing the code publicly.
+MIT. See the [LICENSE](LICENSE) file.

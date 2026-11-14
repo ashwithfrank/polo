@@ -1,10 +1,8 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 
 import '../models/file_item.dart';
 import '../models/storage_category.dart';
-import '../services/file_service.dart';
+import '../widgets/delete_file.dart';
 import '../services/storage_controller.dart';
 import '../services/storage_info.dart';
 import '../services/storage_scanner.dart';
@@ -14,47 +12,18 @@ import '../widgets/message_view.dart';
 import '../widgets/open_file.dart';
 
 class StorageScreen extends StatelessWidget {
-  const StorageScreen({super.key, required this.controller});
+  const StorageScreen({
+    super.key,
+    required this.controller,
+    required this.onOpenCategory,
+  });
 
   final StorageController controller;
+  final void Function(StorageCategory category) onOpenCategory;
 
   Future<void> _confirmDelete(BuildContext context, FileItem item) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete this file?'),
-        content: Text('${item.name} (${item.sizeLabel}) will be deleted. This can\'t be undone.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
-              foregroundColor: Theme.of(context).colorScheme.onError,
-            ),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-    if (ok != true || !context.mounted) return;
-
-    try {
-      await FileService().delete(item);
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text('Deleted ${item.name}')));
-    } on FileSystemException catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text(e.osError?.message ?? e.message)));
-    }
-    await controller.load();
+    final moved = await deleteFileWithConfirm(context, item);
+    if (moved) await controller.load();
   }
 
   @override
@@ -129,27 +98,27 @@ class StorageScreen extends StatelessWidget {
                   child: Center(child: Text(controller.error ?? 'Pull down to scan your files.')),
                 )
               else ...[
-                ..._legend(context, scan),
-                const SizedBox(height: 24),
-                Text('Largest files', style: titleStyle),
-                const SizedBox(height: 4),
-                if (scan.largest.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 16),
-                    child: Text('No files over 20 MB. Nothing big to clean up.'),
-                  )
-                else
-                  for (final item in scan.largest)
-                    FileTile(
-                      item: item,
-                      onTap: () => openFile(context, item),
-                      trailing: IconButton(
-                        tooltip: 'Delete',
-                        icon: const Icon(Icons.delete_outline),
-                        onPressed: () => _confirmDelete(context, item),
+                  ..._legend(context, scan),
+                  const SizedBox(height: 24),
+                  Text('Largest files', style: titleStyle),
+                  const SizedBox(height: 4),
+                  if (scan.largest.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 16),
+                      child: Text('No files over 20 MB. Nothing big to clean up.'),
+                    )
+                  else
+                    for (final item in scan.largest)
+                      FileTile(
+                        item: item,
+                        onTap: () => openFile(context, item),
+                        trailing: IconButton(
+                          tooltip: 'Delete',
+                          icon: const Icon(Icons.delete_outline),
+                          onPressed: () => _confirmDelete(context, item),
+                        ),
                       ),
-                    ),
-              ],
+                ],
             ],
           ),
         );
@@ -167,8 +136,10 @@ class StorageScreen extends StatelessWidget {
     final info = controller.info;
     final system = info == null ? 0 : info.used - scan.totalBytes;
 
-    Widget row(Color color, String title, String subtitle, int bytes) {
+    Widget row(Color color, String title, String subtitle, int bytes,
+        {VoidCallback? onTap}) {
       return ListTile(
+        onTap: onTap,
         dense: true,
         contentPadding: EdgeInsets.zero,
         leading: Container(
@@ -189,6 +160,7 @@ class StorageScreen extends StatelessWidget {
           c.label,
           '${scan.counts[c]} ${scan.counts[c] == 1 ? 'file' : 'files'}',
           scan.bytes[c]!,
+          onTap: () => onOpenCategory(c),
         ),
       if (system > 0)
         row(
@@ -244,11 +216,11 @@ class _UsageBar extends StatelessWidget {
         child: segments.isEmpty
             ? ColoredBox(color: scheme.surfaceContainerHighest)
             : Row(
-                children: [
-                  for (final s in segments)
-                    Expanded(flex: s.flex, child: ColoredBox(color: s.color)),
-                ],
-              ),
+          children: [
+            for (final s in segments)
+              Expanded(flex: s.flex, child: ColoredBox(color: s.color)),
+          ],
+        ),
       ),
     );
   }

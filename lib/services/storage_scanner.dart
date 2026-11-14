@@ -11,12 +11,16 @@ class ScanResult {
     required this.counts,
     required this.largest,
     required this.recent,
+    required this.index,
   });
 
   final Map<StorageCategory, int> bytes;
   final Map<StorageCategory, int> counts;
   final List<FileItem> largest;
   final List<FileItem> recent;
+
+  /// Every file and folder found. Used by search and the category screens.
+  final List<FileItem> index;
 
   int get totalBytes => bytes.values.fold(0, (a, b) => a + b);
   int get totalFiles => counts.values.fold(0, (a, b) => a + b);
@@ -38,6 +42,7 @@ ScanResult _scanSync() {
   final counts = {for (final c in StorageCategory.values) c: 0};
   final largest = <FileItem>[];
   final recent = <FileItem>[];
+  final index = <FileItem>[];
 
   int bySize(FileItem a, FileItem b) => b.size.compareTo(a.size);
   int byDate(FileItem a, FileItem b) => b.modified.compareTo(a.modified);
@@ -59,6 +64,15 @@ ScanResult _scanSync() {
       if (entity is Directory) {
         if (name.startsWith('.') || skipped.contains(entity.path)) continue;
         stack.add(entity.path);
+        try {
+          index.add(FileItem(
+            path: entity.path,
+            name: name,
+            isDirectory: true,
+            size: 0,
+            modified: entity.statSync().modified,
+          ));
+        } catch (_) {}
       } else if (entity is File) {
         FileStat stat;
         try {
@@ -75,6 +89,7 @@ ScanResult _scanSync() {
           modified: stat.modified,
         );
 
+        index.add(item);
         final category = StorageCategory.of(item.kind);
         bytes[category] = bytes[category]! + stat.size;
         counts[category] = counts[category]! + 1;
@@ -106,5 +121,6 @@ ScanResult _scanSync() {
     counts: counts,
     largest: largest.take(25).toList(),
     recent: recent.take(15).toList(),
+    index: index,
   );
 }

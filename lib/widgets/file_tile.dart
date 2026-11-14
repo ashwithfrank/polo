@@ -11,6 +11,7 @@ class FileTile extends StatelessWidget {
     this.onLongPress,
     this.selected = false,
     this.trailing,
+    this.subtitle,
   });
 
   final FileItem item;
@@ -19,10 +20,13 @@ class FileTile extends StatelessWidget {
   final bool selected;
   final Widget? trailing;
 
+  /// Replaces the default "size · date" line.
+  final String? subtitle;
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final (icon, color) = _iconFor(item.kind, scheme);
+    final (icon, color) = fileIconFor(item.kind, scheme);
 
     final iconBox = Container(
       width: 42,
@@ -68,23 +72,25 @@ class FileTile extends StatelessWidget {
       ),
       title: Text(item.name, maxLines: 1, overflow: TextOverflow.ellipsis),
       subtitle: Text(
-        item.isDirectory ? item.dateLabel : '${item.sizeLabel} · ${item.dateLabel}',
+        subtitle ??
+            (item.isDirectory ? item.dateLabel : '${item.sizeLabel} · ${item.dateLabel}'),
         style: TextStyle(color: scheme.onSurface.withValues(alpha: 0.6), fontSize: 12),
       ),
     );
   }
+}
 
-  (IconData, Color) _iconFor(FileKind kind, ColorScheme scheme) {
-    return switch (kind) {
-      FileKind.folder => (Icons.folder_rounded, scheme.primary),
-      FileKind.image => (Icons.image_outlined, Colors.pink),
-      FileKind.video => (Icons.movie_outlined, Colors.deepPurple),
-      FileKind.audio => (Icons.audiotrack_outlined, Colors.teal),
-      FileKind.pdf => (Icons.picture_as_pdf_outlined, Colors.red),
-      FileKind.document => (Icons.description_outlined, Colors.blue),
-      FileKind.archive => (Icons.folder_zip_outlined, Colors.amber.shade800),
-      FileKind.apk => (Icons.android, Colors.green),
-      FileKind.other => (Icons.insert_drive_file_outlined, scheme.onSurface.withValues(alpha: 0.6)),
-    };
-  }
+/// Icon and colour used for a kind of file.
+(IconData, Color) fileIconFor(FileKind kind, ColorScheme scheme) {
+  return switch (kind) {
+    FileKind.folder => (Icons.folder_rounded, scheme.primary),
+    FileKind.image => (Icons.image_outlined, Colors.pink),
+    FileKind.video => (Icons.movie_outlined, Colors.deepPurple),
+    FileKind.audio => (Icons.audiotrack_outlined, Colors.teal),
+    FileKind.pdf => (Icons.picture_as_pdf_outlined, Colors.red),
+    FileKind.document => (Icons.description_outlined, Colors.blue),
+    FileKind.archive => (Icons.folder_zip_outlined, Colors.amber.shade800),
+    FileKind.apk => (Icons.android, Colors.green),
+    FileKind.other => (Icons.insert_drive_file_outlined, scheme.onSurface.withValues(alpha: 0.6)),
+  };
 }

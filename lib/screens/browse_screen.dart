@@ -6,14 +6,25 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../models/file_item.dart';
+import '../services/archive_service.dart';
 import '../services/convert_service.dart';
+import '../services/settings_controller.dart';
 import '../services/file_service.dart';
+import '../services/trash_service.dart';
+import '../widgets/file_details.dart';
+import '../widgets/file_grid_tile.dart';
 import '../widgets/file_tile.dart';
+import '../widgets/name_dialog.dart';
 import 'convert_images_screen.dart';
 import 'images_to_pdf_screen.dart';
 
 class BrowseScreen extends StatefulWidget {
-  const BrowseScreen({super.key, required this.active, this.jumpTo});
+  const BrowseScreen({
+    super.key,
+    required this.active,
+    required this.settings,
+    this.jumpTo,
+  });
 
   /// True while this tab is the visible one. Used so the system back button
   /// only walks up folders when Browse is on screen.
@@ -22,12 +33,16 @@ class BrowseScreen extends StatefulWidget {
   /// Set a folder path on this notifier to make Browse open that folder.
   final ValueNotifier<String?>? jumpTo;
 
+  /// Sort order and hidden-files choice, saved between launches.
+  final SettingsController settings;
+
   @override
   State<BrowseScreen> createState() => _BrowseScreenState();
 }
 
 class _BrowseScreenState extends State<BrowseScreen> with WidgetsBindingObserver {
   final _service = FileService();
+  late final _archive = ArchiveService(_service);
   final _crumbScroll = ScrollController();
 
   bool? _granted;
@@ -35,8 +50,10 @@ class _BrowseScreenState extends State<BrowseScreen> with WidgetsBindingObserver
   List<FileItem> _items = const [];
   bool _loading = false;
   String? _error;
-  SortBy _sortBy = SortBy.name;
-  bool _showHidden = false;
+  SortBy get _sortBy => widget.settings.sortBy;
+  bool get _showHidden => widget.settings.showHidden;
+  late SortBy _lastSort = _sortBy;
+  late bool _lastHidden = _showHidden;
 
   final Set<String> _selected = {};
   List<FileItem> _clipboard = const [];
@@ -52,6 +69,7 @@ class _BrowseScreenState extends State<BrowseScreen> with WidgetsBindingObserver
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     widget.jumpTo?.addListener(_onJump);
+    widget.settings.addListener(_onSettings);
     _checkPermission();
   }
 
@@ -59,8 +77,21 @@ class _BrowseScreenState extends State<BrowseScreen> with WidgetsBindingObserver
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     widget.jumpTo?.removeListener(_onJump);
+    widget.settings.removeListener(_onSettings);
     _crumbScroll.dispose();
     super.dispose();
+  }
+
+  void _onSettings() {
+    // Sort order or hidden-files choice changed, here or in Settings.
+    final changed = _lastSort != _sortBy || _lastHidden != _showHidden;
+    _lastSort = _sortBy;
+    _lastHidden = _showHidden;
+    if (changed && _granted == true) {
+      _load(_path, showSpinner: false);
+    } else if (mounted) {
+      setState(() {}); // e.g. list/grid switch
+    }
   }
 
   void _onJump() {
@@ -180,6 +211,10 @@ class _BrowseScreenState extends State<BrowseScreen> with WidgetsBindingObserver
       await _load(item.path);
       return;
     }
+    if (item.extension == 'zip') {
+      await _zipTapMenu(item);
+      return;
+    }
     final result = await OpenFilex.open(item.path);
     if (result.type != ResultType.done && mounted) {
       _toast(result.type == ResultType.noAppToOpen
@@ -253,9 +288,12 @@ class _BrowseScreenState extends State<BrowseScreen> with WidgetsBindingObserver
     );
   }
 
-  Future<void> _convert() async {
+  Future<void> _more() async {
     final items = _selectedItems;
     if (items.isEmpty) return;
+    final single = items.length == 1;
+    final allImages = items.every(ConvertService.canConvert);
+    final isZip = single && !items.first.isDirectory && items.first.extension == 'zip';
 
     final choice = await showModalBottomSheet<String>(
       context: context,
@@ -264,15 +302,156 @@ class _BrowseScreenState extends State<BrowseScreen> with WidgetsBindingObserver
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            if (single)
+              ListTile(
+                leading: const Icon(Icons.info_outline),
+                title: const Text('Details'),
+                onTap: () => Navigator.pop(context, 'details'),
+              ),
+            if (single)
+              ListTile(
+                leading: const Icon(Icons.drive_file_rename_outline),
+                title: const Text('Rename'),
+                onTap: () => Navigator.pop(context, 'rename'),
+              ),
             ListTile(
-              leading: const Icon(Icons.transform),
-              title: const Text('Convert to PNG or JPG'),
-              onTap: () => Navigator.pop(context, 'image'),
+              leading: const Icon(Icons.folder_zip_outlined),
+              title: const Text('Compress to ZIP'),
+              onTap: () => Navigator.pop(context, 'zip'),
+            ),
+            if (isZip)
+              ListTile(
+                leading: const Icon(Icons.unarchive_outlined),
+                title: const Text('Extract here'),
+                onTap: () => Navigator.pop(context, 'unzip'),
+              ),
+            if (allImages) ...[
+              ListTile(
+                leading: const Icon(Icons.transform),
+                title: const Text('Convert to PNG or JPG'),
+                onTap: () => Navigator.pop(context, 'image'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.picture_as_pdf_outlined),
+                title: Text(single ? 'Make a PDF' : 'Combine into one PDF'),
+                onTap: () => Navigator.pop(context, 'pdf'),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+    if (choice == null || !mounted) return;
+
+    switch (choice) {
+      case 'details':
+        await showFileDetails(context, items.first);
+      case 'rename':
+        await _rename();
+      case 'zip':
+        await _zip(items);
+      case 'unzip':
+        await _unzip(items.first);
+      case 'image' || 'pdf':
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => choice == 'pdf'
+                ? ImagesToPdfScreen(files: items)
+                : ConvertImagesScreen(files: items),
+          ),
+        );
+        if (!mounted) return;
+        setState(_selected.clear);
+        await _load(_path, showSpinner: false);
+    }
+  }
+
+  Future<void> _zip(List<FileItem> items) async {
+    final first = items.first;
+    final dot = first.name.lastIndexOf('.');
+    final base = first.isDirectory || dot <= 0 ? first.name : first.name.substring(0, dot);
+
+    final name = await showDialog<String>(
+      context: context,
+      builder: (_) => NameDialog(
+        title: 'Compress to ZIP',
+        confirmLabel: 'Compress',
+        initial: items.length == 1 ? base : 'Archive',
+        hint: 'File name',
+        suffix: '.zip',
+        existing: const {},
+      ),
+    );
+    if (name == null || !mounted) return;
+
+    setState(() => _loading = true);
+    String? created;
+    String? error;
+    try {
+      created = await _archive.createZip(items, _path, '$name.zip');
+    } on FileSystemException catch (e) {
+      error = e.message;
+    } catch (_) {
+      error = "Couldn't create the ZIP";
+    }
+
+    setState(_selected.clear);
+    await _load(_path);
+    if (!mounted) return;
+    _toast(error ?? 'Created ${created!.split('/').last}');
+  }
+
+  Future<void> _unzip(FileItem item) async {
+    setState(() => _loading = true);
+    ExtractResult? result;
+    String? error;
+    try {
+      result = await _archive.extractZip(item);
+    } catch (_) {
+      error = "Couldn't extract this ZIP. It may be damaged or password protected.";
+    }
+
+    setState(_selected.clear);
+    await _load(_path);
+    if (!mounted) return;
+
+    if (result == null) {
+      _toast(error!);
+      return;
+    }
+    final extracted = result;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            'Extracted ${extracted.fileCount} ${extracted.fileCount == 1 ? 'file' : 'files'} to ${extracted.folderName}',
+          ),
+          action: SnackBarAction(
+            label: 'Open',
+            onPressed: () => _load(extracted.folderPath),
+          ),
+        ),
+      );
+  }
+
+  Future<void> _zipTapMenu(FileItem item) async {
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.unarchive_outlined),
+              title: const Text('Extract here'),
+              onTap: () => Navigator.pop(context, 'extract'),
             ),
             ListTile(
-              leading: const Icon(Icons.picture_as_pdf_outlined),
-              title: Text(items.length == 1 ? 'Make a PDF' : 'Combine into one PDF'),
-              onTap: () => Navigator.pop(context, 'pdf'),
+              leading: const Icon(Icons.open_in_new),
+              title: const Text('Open with another app'),
+              onTap: () => Navigator.pop(context, 'open'),
             ),
           ],
         ),
@@ -280,16 +459,16 @@ class _BrowseScreenState extends State<BrowseScreen> with WidgetsBindingObserver
     );
     if (choice == null || !mounted) return;
 
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => choice == 'pdf'
-            ? ImagesToPdfScreen(files: items)
-            : ConvertImagesScreen(files: items),
-      ),
-    );
-    if (!mounted) return;
-    setState(_selected.clear);
-    await _load(_path, showSpinner: false);
+    if (choice == 'extract') {
+      await _unzip(item);
+    } else {
+      final result = await OpenFilex.open(item.path);
+      if (result.type != ResultType.done && mounted) {
+        _toast(result.type == ResultType.noAppToOpen
+            ? 'No app can open this file'
+            : result.message);
+      }
+    }
   }
 
   Future<void> _rename() async {
@@ -324,8 +503,8 @@ class _BrowseScreenState extends State<BrowseScreen> with WidgetsBindingObserver
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Delete ${_count(items.length)}?'),
-        content: const Text("This can't be undone."),
+        title: Text('Move ${_count(items.length)} to trash?'),
+        content: Text('You can restore them from Trash (in Settings) for ${TrashService.retentionDays} days.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -337,7 +516,7 @@ class _BrowseScreenState extends State<BrowseScreen> with WidgetsBindingObserver
               backgroundColor: Theme.of(context).colorScheme.error,
               foregroundColor: Theme.of(context).colorScheme.onError,
             ),
-            child: const Text('Delete'),
+            child: const Text('Move to trash'),
           ),
         ],
       ),
@@ -345,11 +524,13 @@ class _BrowseScreenState extends State<BrowseScreen> with WidgetsBindingObserver
     if (ok != true || !mounted) return;
 
     setState(() => _loading = true);
+    final trash = TrashService(_service);
+    final moved = <TrashEntry>[];
     var done = 0;
     String? error;
     for (final item in items) {
       try {
-        await _service.delete(item);
+        moved.add(await trash.moveToTrash(item));
         done++;
       } on FileSystemException catch (e) {
         error = e.osError?.message ?? e.message;
@@ -358,7 +539,28 @@ class _BrowseScreenState extends State<BrowseScreen> with WidgetsBindingObserver
     setState(() => _selected.clear());
     await _load(_path);
     if (!mounted) return;
-    _toast(error ?? 'Deleted ${_count(done)}');
+    if (error != null || moved.isEmpty) {
+      _toast(error ?? 'Nothing was deleted');
+      return;
+    }
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text('Moved ${_count(done)} to trash'),
+          action: SnackBarAction(
+            label: 'Undo',
+            onPressed: () async {
+              for (final e in moved) {
+                try {
+                  await trash.restore(e);
+                } on FileSystemException catch (_) {}
+              }
+              if (mounted) await _load(_path, showSpinner: false);
+            },
+          ),
+        ),
+      );
   }
 
   Future<void> _newFolder() async {
@@ -489,21 +691,20 @@ class _BrowseScreenState extends State<BrowseScreen> with WidgetsBindingObserver
           onPressed: _newFolder,
         ),
         IconButton(
+          tooltip: widget.settings.gridView ? 'List view' : 'Grid view',
+          icon: Icon(widget.settings.gridView ? Icons.view_list_outlined : Icons.grid_view_outlined),
+          onPressed: () => widget.settings.setGridView(!widget.settings.gridView),
+        ),
+        IconButton(
           tooltip: _showHidden ? 'Hide hidden files' : 'Show hidden files',
           icon: Icon(_showHidden ? Icons.visibility_outlined : Icons.visibility_off_outlined),
-          onPressed: () {
-            setState(() => _showHidden = !_showHidden);
-            _load(_path);
-          },
+          onPressed: () => widget.settings.setShowHidden(!_showHidden),
         ),
         PopupMenuButton<SortBy>(
           tooltip: 'Sort',
           icon: const Icon(Icons.sort),
           initialValue: _sortBy,
-          onSelected: (value) {
-            setState(() => _sortBy = value);
-            _load(_path);
-          },
+          onSelected: widget.settings.setSortBy,
           itemBuilder: (_) => [
             CheckedPopupMenuItem(
               value: SortBy.name,
@@ -548,7 +749,27 @@ class _BrowseScreenState extends State<BrowseScreen> with WidgetsBindingObserver
     }
     return RefreshIndicator(
       onRefresh: () => _load(_path, showSpinner: false),
-      child: ListView.builder(
+      child: widget.settings.gridView
+          ? GridView.builder(
+        padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
+        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+          maxCrossAxisExtent: 130,
+          mainAxisSpacing: 10,
+          crossAxisSpacing: 10,
+          childAspectRatio: 0.82,
+        ),
+        itemCount: _items.length,
+        itemBuilder: (context, i) {
+          final item = _items[i];
+          return FileGridTile(
+            item: item,
+            selected: _selected.contains(item.path),
+            onTap: () => _onTap(item),
+            onLongPress: () => _toggle(item),
+          );
+        },
+      )
+          : ListView.builder(
         padding: const EdgeInsets.only(bottom: 16),
         itemCount: _items.length,
         itemBuilder: (context, i) {
@@ -583,14 +804,7 @@ class _BrowseScreenState extends State<BrowseScreen> with WidgetsBindingObserver
               onTap: () => _stageClipboard(move: true),
             ),
             _ActionButton(icon: Icons.share_outlined, label: 'Share', onTap: _share),
-            if (_selectedItems.isNotEmpty && _selectedItems.every(ConvertService.canConvert))
-              _ActionButton(icon: Icons.transform, label: 'Convert', onTap: _convert),
-            if (_selected.length == 1)
-              _ActionButton(
-                icon: Icons.drive_file_rename_outline,
-                label: 'Rename',
-                onTap: _rename,
-              ),
+            _ActionButton(icon: Icons.more_horiz, label: 'More', onTap: _more),
             _ActionButton(
               icon: Icons.delete_outline,
               label: 'Delete',

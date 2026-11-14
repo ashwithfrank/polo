@@ -15,6 +15,8 @@ class FileItem {
   final int size;
   final DateTime modified;
 
+  String get parentPath => path.substring(0, path.lastIndexOf('/'));
+
   String get extension {
     final i = name.lastIndexOf('.');
     if (i <= 0 || i == name.length - 1) return '';

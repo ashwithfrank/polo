@@ -29,7 +29,7 @@ class FileThumb extends StatelessWidget {
           cacheWidth: (size * 3).round(),
           filterQuality: FilterQuality.low,
           gaplessPlayback: true,
-          errorBuilder: (_, __, ___) => fallback,
+          errorBuilder: (_, _, _) => fallback,
         ),
       ),
     );

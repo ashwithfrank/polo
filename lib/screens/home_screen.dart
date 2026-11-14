@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../models/storage_category.dart';
 import '../services/file_service.dart';
 import '../services/storage_controller.dart';
 import '../services/storage_info.dart';
@@ -14,11 +15,15 @@ class HomeScreen extends StatelessWidget {
     required this.controller,
     required this.onOpenFolder,
     required this.onOpenStorage,
+    required this.onSearch,
+    required this.onOpenCategory,
   });
 
   final StorageController controller;
   final void Function(String path) onOpenFolder;
   final VoidCallback onOpenStorage;
+  final VoidCallback onSearch;
+  final void Function(StorageCategory category) onOpenCategory;
 
   @override
   Widget build(BuildContext context) {
@@ -44,10 +49,33 @@ class HomeScreen extends StatelessWidget {
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
             children: [
+              _SearchPill(onTap: onSearch),
+              const SizedBox(height: 16),
               _StorageCard(
                 info: controller.info,
                 loading: controller.loading,
                 onTap: onOpenStorage,
+              ),
+              const SizedBox(height: 24),
+              Text('Categories', style: titleStyle),
+              const SizedBox(height: 10),
+              SizedBox(
+                height: 40,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  children: [
+                    for (final c in StorageCategory.values
+                        .where((c) => c != StorageCategory.other))
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: ActionChip(
+                          avatar: Icon(c.icon, size: 18, color: c.color),
+                          label: Text(c.label),
+                          onPressed: () => onOpenCategory(c),
+                        ),
+                      ),
+                  ],
+                ),
               ),
               const SizedBox(height: 24),
               Text('Quick access', style: titleStyle),
@@ -112,6 +140,38 @@ final _quickAccess = <({String label, IconData icon, String folder, Color color}
   (label: 'Music', icon: Icons.music_note_outlined, folder: 'Music', color: Colors.teal),
   (label: 'Movies', icon: Icons.movie_outlined, folder: 'Movies', color: Colors.deepPurple),
 ];
+
+class _SearchPill extends StatelessWidget {
+  const _SearchPill({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Material(
+      color: scheme.surfaceContainerHighest,
+      borderRadius: BorderRadius.circular(28),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(28),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              Icon(Icons.search, color: scheme.onSurface.withValues(alpha: 0.6)),
+              const SizedBox(width: 12),
+              Text(
+                'Search files and folders',
+                style: TextStyle(color: scheme.onSurface.withValues(alpha: 0.6)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class _StorageCard extends StatelessWidget {
   const _StorageCard({required this.info, required this.loading, required this.onTap});

@@ -10,10 +10,18 @@ import '../widgets/file_tile.dart';
 /// A small in-app file picker. Shows folders and the files [accepts] allows,
 /// and pops with the list of chosen [FileItem]s.
 class PickFilesScreen extends StatefulWidget {
-  const PickFilesScreen({super.key, required this.title, required this.accepts});
+  const PickFilesScreen({
+    super.key,
+    required this.title,
+    required this.accepts,
+    this.selectFolders = false,
+  });
 
   final String title;
   final bool Function(FileItem item) accepts;
+
+  /// When true, long-press a folder to select it (tap still opens it).
+  final bool selectFolders;
 
   @override
   State<PickFilesScreen> createState() => _PickFilesScreenState();
@@ -136,18 +144,18 @@ class _PickFilesScreenState extends State<PickFilesScreen> with WidgetsBindingOb
         bottomNavigationBar: count == 0
             ? null
             : SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-                  child: FilledButton(
-                    style: FilledButton.styleFrom(
-                      minimumSize: const Size.fromHeight(48),
-                      backgroundColor: scheme.primary,
-                    ),
-                    onPressed: () => Navigator.pop(context, _picked.values.toList()),
-                    child: Text('Continue with $count ${count == 1 ? 'file' : 'files'}'),
-                  ),
-                ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+            child: FilledButton(
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(48),
+                backgroundColor: scheme.primary,
               ),
+              onPressed: () => Navigator.pop(context, _picked.values.toList()),
+              child: Text('Continue with $count ${count == 1 ? 'file' : 'files'}'),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -182,7 +190,9 @@ class _PickFilesScreenState extends State<PickFilesScreen> with WidgetsBindingOb
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
             child: Text(
-              _pathLabel,
+              widget.selectFolders
+                  ? '$_pathLabel · long-press a folder to select it'
+                  : _pathLabel,
               style: TextStyle(color: scheme.onSurface.withValues(alpha: 0.6), fontSize: 13),
             ),
           ),
@@ -190,21 +200,24 @@ class _PickFilesScreenState extends State<PickFilesScreen> with WidgetsBindingOb
         Expanded(
           child: _items.isEmpty
               ? const _CenteredMessage(
-                  icon: Icons.folder_open_outlined,
-                  title: 'Nothing to choose here',
-                  body: 'Open another folder to find files.',
-                )
+            icon: Icons.folder_open_outlined,
+            title: 'Nothing to choose here',
+            body: 'Open another folder to find files.',
+          )
               : ListView.builder(
-                  itemCount: _items.length,
-                  itemBuilder: (context, i) {
-                    final item = _items[i];
-                    return FileTile(
-                      item: item,
-                      selected: _picked.containsKey(item.path),
-                      onTap: () => item.isDirectory ? _load(item.path) : _toggle(item),
-                    );
-                  },
-                ),
+            itemCount: _items.length,
+            itemBuilder: (context, i) {
+              final item = _items[i];
+              return FileTile(
+                item: item,
+                selected: _picked.containsKey(item.path),
+                onTap: () => item.isDirectory ? _load(item.path) : _toggle(item),
+                onLongPress: item.isDirectory && !widget.selectFolders
+                    ? null
+                    : () => _toggle(item),
+              );
+            },
+          ),
         ),
       ],
     );

@@ -43,7 +43,6 @@ class _ImagesToPdfScreenState extends State<ImagesToPdfScreen> {
 
   void _reorder(int oldIndex, int newIndex) {
     setState(() {
-      if (newIndex > oldIndex) newIndex -= 1;
       _files.insert(newIndex, _files.removeAt(oldIndex));
     });
   }
@@ -102,7 +101,7 @@ class _ImagesToPdfScreenState extends State<ImagesToPdfScreen> {
         header: _buildOptions(context, locked),
         buildDefaultDragHandles: false,
         itemCount: _files.length,
-        onReorder: locked ? (_, __) {} : _reorder,
+        onReorderItem: locked ? (_, _) {} : _reorder,
         itemBuilder: (context, i) {
           final f = _files[i];
           return ListTile(
