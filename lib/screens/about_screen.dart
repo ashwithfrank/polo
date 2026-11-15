@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import '../widgets/polo_message.dart';
 
 class AboutScreen extends StatefulWidget {
   const AboutScreen({super.key});
@@ -74,8 +75,13 @@ class _AboutScreenState extends State<AboutScreen> {
               ),
               const Divider(height: 1),
               const ListTile(
+                leading: Icon(Icons.person_outline),
+                title: Text('Developed by'),
+                subtitle: Text('Ashwith Frank'),
+              ),
+              const ListTile(
                 leading: Icon(Icons.code),
-                title: Text('Made by'),
+                title: Text('Powered by'),
                 subtitle: Text('AlphaOmega Studio'),
               ),
               ListTile(
@@ -90,9 +96,7 @@ class _AboutScreenState extends State<AboutScreen> {
                 onTap: () async {
                   await Clipboard.setData(const ClipboardData(text: _repoUrl));
                   if (!context.mounted) return;
-                  ScaffoldMessenger.of(context)
-                    ..hideCurrentSnackBar()
-                    ..showSnackBar(const SnackBar(content: Text('Link copied')));
+                  showPoloMessage(context, 'Link copied');
                 },
               ),
               ListTile(
@@ -103,7 +107,7 @@ class _AboutScreenState extends State<AboutScreen> {
                   context: context,
                   applicationName: 'Polo',
                   applicationVersion: info?.version,
-                  applicationLegalese: '© 2026 AlphaOmega Studio',
+                  applicationLegalese: '© 2026 Ashwith Frank, AlphaOmega Studio',
                 ),
               ),
             ],

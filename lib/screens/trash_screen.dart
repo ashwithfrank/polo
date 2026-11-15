@@ -8,6 +8,7 @@ import '../utils/paths.dart';
 import '../widgets/file_details.dart';
 import '../widgets/file_tile.dart';
 import '../widgets/message_view.dart';
+import '../widgets/polo_message.dart';
 
 class TrashScreen extends StatefulWidget {
   const TrashScreen({super.key});
@@ -43,9 +44,7 @@ class _TrashScreenState extends State<TrashScreen> {
   }
 
   void _toast(String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
+    showPoloMessage(context, message);
   }
 
   Future<bool> _confirm(String title, String body, String action) async {

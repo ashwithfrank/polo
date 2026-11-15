@@ -33,9 +33,11 @@ class _NameDialogState extends State<NameDialog> {
   void initState() {
     super.initState();
     _controller = TextEditingController(text: widget.initial);
+    // Select the name but not its extension, so renaming keeps ".jpg" etc.
+    final dot = widget.initial.lastIndexOf('.');
     _controller.selection = TextSelection(
       baseOffset: 0,
-      extentOffset: widget.initial.length,
+      extentOffset: dot > 0 ? dot : widget.initial.length,
     );
   }
 

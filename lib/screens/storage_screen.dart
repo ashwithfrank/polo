@@ -9,6 +9,7 @@ import '../services/storage_scanner.dart';
 import '../utils/format.dart';
 import '../widgets/file_tile.dart';
 import '../widgets/message_view.dart';
+import '../widgets/motion.dart';
 import '../widgets/open_file.dart';
 
 class StorageScreen extends StatelessWidget {
@@ -211,15 +212,25 @@ class _UsageBar extends StatelessWidget {
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(8),
-      child: SizedBox(
-        height: 14,
-        child: segments.isEmpty
-            ? ColoredBox(color: scheme.surfaceContainerHighest)
-            : Row(
-          children: [
-            for (final s in segments)
-              Expanded(flex: s.flex, child: ColoredBox(color: s.color)),
-          ],
+      child: ColoredBox(
+        color: scheme.surfaceContainerHighest,
+        child: TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0, end: 1),
+          duration: motion(context, 700),
+          curve: Curves.easeOutCubic,
+          builder: (context, value, child) =>
+              ClipRect(clipper: RevealClipper(value), child: child),
+          child: SizedBox(
+            height: 14,
+            child: segments.isEmpty
+                ? const SizedBox.shrink()
+                : Row(
+              children: [
+                for (final s in segments)
+                  Expanded(flex: s.flex, child: ColoredBox(color: s.color)),
+              ],
+            ),
+          ),
         ),
       ),
     );

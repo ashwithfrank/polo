@@ -1,12 +1,15 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../models/file_item.dart';
 import '../services/archive_service.dart';
+import 'batch_rename_screen.dart';
+import 'checksum_screen.dart';
 import '../services/convert_service.dart';
 import '../services/settings_controller.dart';
 import '../services/file_service.dart';
@@ -15,8 +18,11 @@ import '../widgets/file_details.dart';
 import '../widgets/file_grid_tile.dart';
 import '../widgets/file_tile.dart';
 import '../widgets/name_dialog.dart';
+import '../widgets/open_file.dart';
+import '../widgets/progress_dialog.dart';
 import 'convert_images_screen.dart';
 import 'images_to_pdf_screen.dart';
+import '../widgets/polo_message.dart';
 
 class BrowseScreen extends StatefulWidget {
   const BrowseScreen({
@@ -197,6 +203,7 @@ class _BrowseScreenState extends State<BrowseScreen> with WidgetsBindingObserver
   // ---------------------------------------------------------------------------
 
   void _toggle(FileItem item) {
+    HapticFeedback.selectionClick();
     setState(() {
       if (!_selected.remove(item.path)) _selected.add(item.path);
     });
@@ -215,18 +222,12 @@ class _BrowseScreenState extends State<BrowseScreen> with WidgetsBindingObserver
       await _zipTapMenu(item);
       return;
     }
-    final result = await OpenFilex.open(item.path);
-    if (result.type != ResultType.done && mounted) {
-      _toast(result.type == ResultType.noAppToOpen
-          ? 'No app can open this file'
-          : result.message);
-    }
+    final deleted = await openFile(context, item);
+    if (deleted.isNotEmpty && mounted) await _load(_path, showSpinner: false);
   }
 
   void _toast(String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
+    showPoloMessage(context, message);
   }
 
   String _count(int n) => n == 1 ? '1 item' : '$n items';
@@ -253,24 +254,30 @@ class _BrowseScreenState extends State<BrowseScreen> with WidgetsBindingObserver
   Future<void> _paste() async {
     final items = _clipboard;
     final move = _clipboardIsMove;
-    setState(() => _loading = true);
+    // Paste works once: the copied or cut items are released straight away.
+    setState(() => _clipboard = const []);
 
+    final detail = ValueNotifier<String>('');
     var done = 0;
     String? error;
-    for (final item in items) {
-      try {
-        if (move) {
-          await _service.move(item, _path);
-        } else {
-          await _service.copy(item, _path);
+    await runWithProgress(context, move ? 'Moving…' : 'Copying…', () async {
+      for (var i = 0; i < items.length; i++) {
+        final item = items[i];
+        detail.value = '${i + 1} of ${items.length} · ${item.name}';
+        try {
+          if (move) {
+            await _service.move(item, _path);
+          } else {
+            await _service.copy(item, _path);
+          }
+          done++;
+        } on FileSystemException catch (e) {
+          error = e.osError?.message ?? e.message;
         }
-        done++;
-      } on FileSystemException catch (e) {
-        error = e.osError?.message ?? e.message;
       }
-    }
+    }, detail: detail);
 
-    if (move) _clipboard = const [];
+    if (!mounted) return;
     await _load(_path);
     if (!mounted) return;
     _toast(error ??
@@ -314,6 +321,18 @@ class _BrowseScreenState extends State<BrowseScreen> with WidgetsBindingObserver
                 title: const Text('Rename'),
                 onTap: () => Navigator.pop(context, 'rename'),
               ),
+            if (!single)
+              ListTile(
+                leading: const Icon(Icons.drive_file_rename_outline),
+                title: const Text('Batch rename'),
+                onTap: () => Navigator.pop(context, 'batchrename'),
+              ),
+            if (single && !items.first.isDirectory)
+              ListTile(
+                leading: const Icon(Icons.verified_outlined),
+                title: const Text('Checksum'),
+                onTap: () => Navigator.pop(context, 'checksum'),
+              ),
             ListTile(
               leading: const Icon(Icons.folder_zip_outlined),
               title: const Text('Compress to ZIP'),
@@ -328,8 +347,13 @@ class _BrowseScreenState extends State<BrowseScreen> with WidgetsBindingObserver
             if (allImages) ...[
               ListTile(
                 leading: const Icon(Icons.transform),
-                title: const Text('Convert to PNG or JPG'),
+                title: const Text('Convert format'),
                 onTap: () => Navigator.pop(context, 'image'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_size_select_large_outlined),
+                title: const Text('Resize and compress'),
+                onTap: () => Navigator.pop(context, 'resize'),
               ),
               ListTile(
                 leading: const Icon(Icons.picture_as_pdf_outlined),
@@ -348,16 +372,28 @@ class _BrowseScreenState extends State<BrowseScreen> with WidgetsBindingObserver
         await showFileDetails(context, items.first);
       case 'rename':
         await _rename();
+      case 'batchrename':
+        final renamed = await Navigator.of(context).push<bool>(
+          MaterialPageRoute(builder: (_) => BatchRenameScreen(items: items)),
+        );
+        if (renamed == true && mounted) {
+          setState(_selected.clear);
+          await _load(_path, showSpinner: false);
+        }
+      case 'checksum':
+        await Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => ChecksumScreen(file: items.first)),
+        );
       case 'zip':
         await _zip(items);
       case 'unzip':
         await _unzip(items.first);
-      case 'image' || 'pdf':
+      case 'image' || 'pdf' || 'resize':
         await Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => choice == 'pdf'
                 ? ImagesToPdfScreen(files: items)
-                : ConvertImagesScreen(files: items),
+                : ConvertImagesScreen(files: items, keepFormat: choice == 'resize'),
           ),
         );
         if (!mounted) return;
@@ -420,19 +456,12 @@ class _BrowseScreenState extends State<BrowseScreen> with WidgetsBindingObserver
       return;
     }
     final extracted = result;
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(
-            'Extracted ${extracted.fileCount} ${extracted.fileCount == 1 ? 'file' : 'files'} to ${extracted.folderName}',
-          ),
-          action: SnackBarAction(
-            label: 'Open',
-            onPressed: () => _load(extracted.folderPath),
-          ),
-        ),
-      );
+    showPoloMessage(
+      context,
+      'Extracted ${extracted.fileCount} ${extracted.fileCount == 1 ? 'file' : 'files'} to ${extracted.folderName}',
+      actionLabel: 'Open',
+      onAction: () => _load(extracted.folderPath),
+    );
   }
 
   Future<void> _zipTapMenu(FileItem item) async {
@@ -478,7 +507,7 @@ class _BrowseScreenState extends State<BrowseScreen> with WidgetsBindingObserver
 
     final name = await showDialog<String>(
       context: context,
-      builder: (_) => _NameDialog(
+      builder: (_) => NameDialog(
         title: 'Rename',
         confirmLabel: 'Rename',
         initial: item.name,
@@ -523,19 +552,23 @@ class _BrowseScreenState extends State<BrowseScreen> with WidgetsBindingObserver
     );
     if (ok != true || !mounted) return;
 
-    setState(() => _loading = true);
     final trash = TrashService(_service);
     final moved = <TrashEntry>[];
+    final detail = ValueNotifier<String>('');
     var done = 0;
     String? error;
-    for (final item in items) {
-      try {
-        moved.add(await trash.moveToTrash(item));
-        done++;
-      } on FileSystemException catch (e) {
-        error = e.osError?.message ?? e.message;
+    await runWithProgress(context, 'Moving to trash…', () async {
+      for (var i = 0; i < items.length; i++) {
+        detail.value = '${i + 1} of ${items.length} · ${items[i].name}';
+        try {
+          moved.add(await trash.moveToTrash(items[i]));
+          done++;
+        } on FileSystemException catch (e) {
+          error = e.osError?.message ?? e.message;
+        }
       }
-    }
+    }, detail: detail);
+    if (!mounted) return;
     setState(() => _selected.clear());
     await _load(_path);
     if (!mounted) return;
@@ -543,41 +576,68 @@ class _BrowseScreenState extends State<BrowseScreen> with WidgetsBindingObserver
       _toast(error ?? 'Nothing was deleted');
       return;
     }
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text('Moved ${_count(done)} to trash'),
-          action: SnackBarAction(
-            label: 'Undo',
-            onPressed: () async {
-              for (final e in moved) {
-                try {
-                  await trash.restore(e);
-                } on FileSystemException catch (_) {}
-              }
-              if (mounted) await _load(_path, showSpinner: false);
-            },
-          ),
-        ),
-      );
+    showPoloMessage(
+      context,
+      'Moved ${_count(done)} to trash',
+      actionLabel: 'Undo',
+      onAction: () async {
+        for (final e in moved) {
+          try {
+            await trash.restore(e);
+          } on FileSystemException catch (_) {}
+        }
+        if (mounted) await _load(_path, showSpinner: false);
+      },
+    );
   }
 
-  Future<void> _newFolder() async {
+  Future<void> _createNew() async {
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.create_new_folder_outlined),
+              title: const Text('New folder'),
+              onTap: () => Navigator.pop(context, 'folder'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.note_add_outlined),
+              title: const Text('New file'),
+              subtitle: const Text('An empty file, for example notes.txt'),
+              onTap: () => Navigator.pop(context, 'file'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (choice == null || !mounted) return;
+    await _create(isFolder: choice == 'folder');
+  }
+
+  Future<void> _create({required bool isFolder}) async {
     final name = await showDialog<String>(
       context: context,
-      builder: (_) => _NameDialog(
-        title: 'New folder',
+      builder: (_) => NameDialog(
+        title: isFolder ? 'New folder' : 'New file',
         confirmLabel: 'Create',
-        hint: 'Folder name',
+        hint: isFolder ? 'Folder name' : 'File name, for example notes.txt',
         existing: _items.map((i) => i.name).toSet(),
       ),
     );
     if (name == null) return;
 
     try {
-      await _service.createFolder(_path, name);
+      if (isFolder) {
+        await _service.createFolder(_path, name);
+      } else {
+        await _service.createFile(_path, name);
+      }
       await _load(_path, showSpinner: false);
+      if (mounted) _toast('Created $name');
     } on FileSystemException catch (e) {
       if (mounted) _toast(e.osError?.message ?? e.message);
     }
@@ -686,19 +746,14 @@ class _BrowseScreenState extends State<BrowseScreen> with WidgetsBindingObserver
           ),
         ),
         IconButton(
-          tooltip: 'New folder',
-          icon: const Icon(Icons.create_new_folder_outlined),
-          onPressed: _newFolder,
+          tooltip: 'New file or folder',
+          icon: const Icon(Icons.add),
+          onPressed: _createNew,
         ),
         IconButton(
           tooltip: widget.settings.gridView ? 'List view' : 'Grid view',
           icon: Icon(widget.settings.gridView ? Icons.view_list_outlined : Icons.grid_view_outlined),
           onPressed: () => widget.settings.setGridView(!widget.settings.gridView),
-        ),
-        IconButton(
-          tooltip: _showHidden ? 'Hide hidden files' : 'Show hidden files',
-          icon: Icon(_showHidden ? Icons.visibility_outlined : Icons.visibility_off_outlined),
-          onPressed: () => widget.settings.setShowHidden(!_showHidden),
         ),
         PopupMenuButton<SortBy>(
           tooltip: 'Sort',
@@ -873,86 +928,6 @@ class _ActionButton extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _NameDialog extends StatefulWidget {
-  const _NameDialog({
-    required this.title,
-    required this.confirmLabel,
-    required this.existing,
-    this.initial = '',
-    this.hint,
-  });
-
-  final String title;
-  final String confirmLabel;
-  final String initial;
-  final String? hint;
-  final Set<String> existing;
-
-  @override
-  State<_NameDialog> createState() => _NameDialogState();
-}
-
-class _NameDialogState extends State<_NameDialog> {
-  late final TextEditingController _controller;
-  String? _error;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = TextEditingController(text: widget.initial);
-    // Pre-select the name without its extension so renaming keeps ".jpg" etc.
-    final dot = widget.initial.lastIndexOf('.');
-    final end = dot > 0 ? dot : widget.initial.length;
-    _controller.selection = TextSelection(baseOffset: 0, extentOffset: end);
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _submit() {
-    final name = _controller.text.trim();
-    String? error;
-    if (name.isEmpty) {
-      error = 'Enter a name';
-    } else if (name.contains('/')) {
-      error = "Names can't contain /";
-    } else if (widget.existing.contains(name)) {
-      error = "That name's already taken";
-    }
-    if (error != null) {
-      setState(() => _error = error);
-      return;
-    }
-    Navigator.pop(context, name);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text(widget.title),
-      content: TextField(
-        controller: _controller,
-        autofocus: true,
-        decoration: InputDecoration(hintText: widget.hint, errorText: _error),
-        onChanged: (_) {
-          if (_error != null) setState(() => _error = null);
-        },
-        onSubmitted: (_) => _submit(),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(onPressed: _submit, child: Text(widget.confirmLabel)),
-      ],
     );
   }
 }

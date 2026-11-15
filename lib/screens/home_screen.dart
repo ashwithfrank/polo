@@ -7,6 +7,7 @@ import '../services/storage_info.dart';
 import '../utils/format.dart';
 import '../widgets/file_tile.dart';
 import '../widgets/message_view.dart';
+import '../widgets/motion.dart';
 import '../widgets/open_file.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -49,36 +50,42 @@ class HomeScreen extends StatelessWidget {
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
             children: [
-              _SearchPill(onTap: onSearch),
+              Reveal(index: 0, child: _SearchPill(onTap: onSearch)),
               const SizedBox(height: 16),
-              _StorageCard(
-                info: controller.info,
-                loading: controller.loading,
-                onTap: onOpenStorage,
-              ),
-              const SizedBox(height: 24),
-              Text('Categories', style: titleStyle),
-              const SizedBox(height: 10),
-              SizedBox(
-                height: 40,
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  children: [
-                    for (final c in StorageCategory.values
-                        .where((c) => c != StorageCategory.other))
-                      Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: ActionChip(
-                          avatar: Icon(c.icon, size: 18, color: c.color),
-                          label: Text(c.label),
-                          onPressed: () => onOpenCategory(c),
-                        ),
-                      ),
-                  ],
+              Reveal(
+                index: 1,
+                child: _StorageCard(
+                  info: controller.info,
+                  loading: controller.loading,
+                  onTap: onOpenStorage,
                 ),
               ),
               const SizedBox(height: 24),
-              Text('Quick access', style: titleStyle),
+              Reveal(index: 2, child: Text('Categories', style: titleStyle)),
+              const SizedBox(height: 10),
+              Reveal(
+                index: 2,
+                child: SizedBox(
+                  height: 40,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    children: [
+                      for (final c in StorageCategory.values
+                          .where((c) => c != StorageCategory.other))
+                        Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: ActionChip(
+                            avatar: Icon(c.icon, size: 18, color: c.color),
+                            label: Text(c.label),
+                            onPressed: () => onOpenCategory(c),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              Reveal(index: 3, child: Text('Quick access', style: titleStyle)),
               const SizedBox(height: 10),
               GridView.count(
                 crossAxisCount: 3,
@@ -88,12 +95,19 @@ class HomeScreen extends StatelessWidget {
                 crossAxisSpacing: 10,
                 childAspectRatio: 1.1,
                 children: [
-                  for (final q in _quickAccess)
-                    _QuickTile(
-                      label: q.label,
-                      icon: q.icon,
-                      color: q.color,
-                      onTap: () => onOpenFolder('${FileService.rootPath}/${q.folder}'),
+                  for (var qi = 0; qi < _quickAccess.length; qi++)
+                    Reveal(
+                      index: 3 + qi ~/ 3,
+                      child: PressScale(
+                        child: _QuickTile(
+                          label: _quickAccess[qi].label,
+                          icon: _quickAccess[qi].icon,
+                          color: _quickAccess[qi].color,
+                          onTap: () => onOpenFolder(
+                            '${FileService.rootPath}/${_quickAccess[qi].folder}',
+                          ),
+                        ),
+                      ),
                     ),
                 ],
               ),
@@ -122,8 +136,11 @@ class HomeScreen extends StatelessWidget {
                   child: Center(child: Text('No recent files yet.')),
                 )
               else
-                for (final item in scan.recent.take(8))
-                  FileTile(item: item, onTap: () => openFile(context, item)),
+                for (final (n, item) in scan.recent.take(8).indexed)
+                  Reveal(
+                    index: 5 + n,
+                    child: FileTile(item: item, onTap: () => openFile(context, item)),
+                  ),
             ],
           ),
         );
@@ -213,11 +230,16 @@ class _StorageCard extends StatelessWidget {
                 const SizedBox(height: 14),
                 ClipRRect(
                   borderRadius: BorderRadius.circular(6),
-                  child: LinearProgressIndicator(
-                    value: i.usedFraction,
-                    minHeight: 8,
-                    backgroundColor: fg.withValues(alpha: 0.3),
-                    color: fg,
+                  child: TweenAnimationBuilder<double>(
+                    tween: Tween(begin: 0, end: i.usedFraction),
+                    duration: motion(context, 800),
+                    curve: Curves.easeOutCubic,
+                    builder: (context, value, _) => LinearProgressIndicator(
+                      value: value,
+                      minHeight: 8,
+                      backgroundColor: fg.withValues(alpha: 0.3),
+                      color: fg,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 8),

@@ -66,6 +66,10 @@ class AppTheme {
         backgroundColor: scheme.surfaceContainerHighest,
         indicatorColor: scheme.primaryContainer,
       ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
       cardTheme: CardThemeData(
         color: scheme.surfaceContainerHighest,
         elevation: 0,

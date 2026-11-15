@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:share_plus/share_plus.dart';
+import 'package:flutter/services.dart';
 
 import '../models/file_item.dart';
 import '../models/storage_category.dart';
@@ -7,11 +7,12 @@ import '../services/storage_controller.dart';
 import '../services/storage_scanner.dart';
 import '../utils/format.dart';
 import '../utils/paths.dart';
-import '../widgets/delete_file.dart';
+import '../widgets/file_actions.dart';
 import '../widgets/file_details.dart';
 import '../widgets/file_tile.dart';
 import '../widgets/message_view.dart';
 import '../widgets/open_file.dart';
+import '../widgets/selection_bar.dart';
 
 enum _Sort { date, size, name }
 
@@ -33,6 +34,9 @@ class CategoryScreen extends StatefulWidget {
 
 class _CategoryScreenState extends State<CategoryScreen> {
   _Sort _sort = _Sort.date;
+  final Set<String> _selected = {};
+
+  bool get _selecting => _selected.isNotEmpty;
 
   List<FileItem> _files(ScanResult scan) {
     final list = scan.index
@@ -52,6 +56,32 @@ class _CategoryScreenState extends State<CategoryScreen> {
     return list;
   }
 
+  void _toggle(FileItem item) {
+    HapticFeedback.selectionClick();
+    setState(() {
+      if (!_selected.remove(item.path)) _selected.add(item.path);
+    });
+  }
+
+  List<FileItem> _selectedFrom(List<FileItem> files) =>
+      files.where((f) => _selected.contains(f.path)).toList();
+
+  /// Forgets files that were moved to the trash.
+  void _removed(List<FileItem> moved) {
+    for (final f in moved) {
+      widget.controller.forget(f);
+    }
+    if (moved.isNotEmpty) widget.controller.markStale();
+    setState(() => _selected.removeAll(moved.map((f) => f.path)));
+  }
+
+  /// Something changed on disk (a new zip, new names): rescan.
+  void _changed() {
+    setState(_selected.clear);
+    widget.controller.markStale();
+    widget.controller.load();
+  }
+
   Future<void> _onAction(String action, FileItem item) async {
     switch (action) {
       case 'folder':
@@ -59,55 +89,126 @@ class _CategoryScreenState extends State<CategoryScreen> {
       case 'details':
         await showFileDetails(context, item);
       case 'share':
-        await SharePlus.instance.share(ShareParams(files: [XFile(item.path)]));
+        await shareFiles(context, [item]);
       case 'delete':
-        final deleted = await deleteFileWithConfirm(context, item);
-        if (deleted) {
-          widget.controller.forget(item);
-          widget.controller.markStale();
-        }
+        _removed(await trashFiles(context, [item]));
     }
+  }
+
+  PreferredSizeWidget _buildAppBar(List<FileItem> files) {
+    if (_selecting) {
+      return AppBar(
+        leading: IconButton(
+          tooltip: 'Cancel selection',
+          icon: const Icon(Icons.close),
+          onPressed: () => setState(_selected.clear),
+        ),
+        title: Text('${_selected.length} selected'),
+        actions: [
+          IconButton(
+            tooltip: 'Select all',
+            icon: const Icon(Icons.select_all),
+            onPressed: () => setState(() => _selected.addAll(files.map((f) => f.path))),
+          ),
+        ],
+      );
+    }
+    return AppBar(
+      title: Text(widget.category.label),
+      actions: [
+        PopupMenuButton<_Sort>(
+          tooltip: 'Sort',
+          icon: const Icon(Icons.sort),
+          initialValue: _sort,
+          onSelected: (v) => setState(() => _sort = v),
+          itemBuilder: (_) => [
+            CheckedPopupMenuItem(
+              value: _Sort.date,
+              checked: _sort == _Sort.date,
+              child: const Text('Newest first'),
+            ),
+            CheckedPopupMenuItem(
+              value: _Sort.size,
+              checked: _sort == _Sort.size,
+              child: const Text('Largest first'),
+            ),
+            CheckedPopupMenuItem(
+              value: _Sort.name,
+              checked: _sort == _Sort.name,
+              child: const Text('Name'),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget? _buildSelectionBar(List<FileItem> files) {
+    if (!_selecting) return null;
+    final chosen = _selectedFrom(files);
+    if (chosen.isEmpty) return null;
+    final scheme = Theme.of(context).colorScheme;
+
+    return SelectionActionBar(
+      actions: [
+        SelectionAction(
+          icon: Icons.share_outlined,
+          label: 'Share',
+          onTap: () => shareFiles(context, chosen),
+        ),
+        SelectionAction(
+          icon: Icons.folder_zip_outlined,
+          label: 'Zip',
+          onTap: () async {
+            if (await zipFiles(context, chosen)) _changed();
+          },
+        ),
+        SelectionAction(
+          icon: Icons.drive_file_rename_outline,
+          label: 'Rename',
+          onTap: () async {
+            if (await renameFiles(context, chosen)) _changed();
+          },
+        ),
+        if (chosen.length == 1)
+          SelectionAction(
+            icon: Icons.info_outline,
+            label: 'Details',
+            onTap: () => showFileDetails(context, chosen.first),
+          ),
+        SelectionAction(
+          icon: Icons.delete_outline,
+          label: 'Delete',
+          color: scheme.error,
+          onTap: () async => _removed(await trashFiles(context, chosen)),
+        ),
+      ],
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.category.label),
-        actions: [
-          PopupMenuButton<_Sort>(
-            tooltip: 'Sort',
-            icon: const Icon(Icons.sort),
-            initialValue: _sort,
-            onSelected: (v) => setState(() => _sort = v),
-            itemBuilder: (_) => [
-              CheckedPopupMenuItem(
-                value: _Sort.date,
-                checked: _sort == _Sort.date,
-                child: const Text('Newest first'),
-              ),
-              CheckedPopupMenuItem(
-                value: _Sort.size,
-                checked: _sort == _Sort.size,
-                child: const Text('Largest first'),
-              ),
-              CheckedPopupMenuItem(
-                value: _Sort.name,
-                checked: _sort == _Sort.name,
-                child: const Text('Name'),
-              ),
-            ],
+    return ListenableBuilder(
+      listenable: widget.controller,
+      builder: (context, _) {
+        final scan = widget.controller.scan;
+        final files = scan == null ? const <FileItem>[] : _files(scan);
+        return PopScope(
+          canPop: !_selecting,
+          onPopInvokedWithResult: (didPop, _) {
+            if (!didPop) setState(_selected.clear);
+          },
+          child: Scaffold(
+            appBar: _buildAppBar(files),
+            body: _buildBody(context, files),
+            bottomNavigationBar: _buildSelectionBar(files),
           ),
-        ],
-      ),
-      body: ListenableBuilder(
-        listenable: widget.controller,
-        builder: (context, _) => _buildBody(context),
-      ),
+        );
+      },
     );
   }
 
-  Widget _buildBody(BuildContext context) {
+  Widget _buildBody(BuildContext context, List<FileItem> files) {
     final c = widget.controller;
     final scheme = Theme.of(context).colorScheme;
 
@@ -134,7 +235,6 @@ class _CategoryScreenState extends State<CategoryScreen> {
       );
     }
 
-    final files = _files(scan);
     if (files.isEmpty) {
       return MessageView(
         icon: widget.category.icon,
@@ -164,8 +264,21 @@ class _CategoryScreenState extends State<CategoryScreen> {
           return FileTile(
             item: item,
             subtitle: '${formatBytes(item.size)} · ${folderLabelFor(item.path)}',
-            onTap: () => openFile(context, item),
-            trailing: PopupMenuButton<String>(
+            selected: _selected.contains(item.path),
+            onLongPress: () => _toggle(item),
+            onTap: () async {
+              if (_selecting) {
+                _toggle(item);
+                return;
+              }
+              final deleted = await openFile(context, item);
+              for (final f in deleted) {
+                widget.controller.forget(f);
+              }
+            },
+            trailing: _selecting
+                ? null
+                : PopupMenuButton<String>(
               onSelected: (v) => _onAction(v, item),
               itemBuilder: (_) => const [
                 PopupMenuItem(value: 'folder', child: Text('Show in folder')),

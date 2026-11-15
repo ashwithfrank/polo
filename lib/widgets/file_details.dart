@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import '../models/file_item.dart';
 import '../utils/format.dart';
 import '../utils/paths.dart';
+import 'polo_message.dart';
 
 class _FolderStats {
   const _FolderStats(this.files, this.folders, this.bytes);
@@ -161,9 +162,7 @@ class _DetailsDialogState extends State<_DetailsDialog> {
         TextButton(
           onPressed: () {
             Clipboard.setData(ClipboardData(text: widget.originalPath ?? item.path));
-            ScaffoldMessenger.of(context)
-              ..hideCurrentSnackBar()
-              ..showSnackBar(const SnackBar(content: Text('Path copied')));
+            showPoloMessage(context, 'Path copied');
           },
           child: const Text('Copy path'),
         ),

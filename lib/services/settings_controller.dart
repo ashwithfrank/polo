@@ -8,14 +8,17 @@ class SettingsController extends ChangeNotifier {
   static const _sortKey = 'sort_by';
   static const _hiddenKey = 'show_hidden';
   static const _gridKey = 'grid_view';
+  static const _favToolsKey = 'favorite_tools';
 
   SortBy _sortBy = SortBy.name;
   bool _showHidden = false;
   bool _gridView = false;
+  final Set<String> _favoriteTools = {};
 
   SortBy get sortBy => _sortBy;
   bool get showHidden => _showHidden;
   bool get gridView => _gridView;
+  bool isFavoriteTool(String id) => _favoriteTools.contains(id);
 
   Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
@@ -26,6 +29,9 @@ class SettingsController extends ChangeNotifier {
     );
     _showHidden = prefs.getBool(_hiddenKey) ?? false;
     _gridView = prefs.getBool(_gridKey) ?? false;
+    _favoriteTools
+      ..clear()
+      ..addAll(prefs.getStringList(_favToolsKey) ?? const []);
     notifyListeners();
   }
 
@@ -51,5 +57,12 @@ class SettingsController extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_gridKey, value);
+  }
+
+  Future<void> toggleFavoriteTool(String id) async {
+    if (!_favoriteTools.remove(id)) _favoriteTools.add(id);
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_favToolsKey, _favoriteTools.toList());
   }
 }

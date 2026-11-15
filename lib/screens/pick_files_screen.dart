@@ -15,6 +15,7 @@ class PickFilesScreen extends StatefulWidget {
     required this.title,
     required this.accepts,
     this.selectFolders = false,
+    this.single = false,
   });
 
   final String title;
@@ -22,6 +23,9 @@ class PickFilesScreen extends StatefulWidget {
 
   /// When true, long-press a folder to select it (tap still opens it).
   final bool selectFolders;
+
+  /// When true, tapping a file picks it straight away.
+  final bool single;
 
   @override
   State<PickFilesScreen> createState() => _PickFilesScreenState();
@@ -132,7 +136,7 @@ class _PickFilesScreenState extends State<PickFilesScreen> with WidgetsBindingOb
         appBar: AppBar(
           title: Text(widget.title),
           actions: [
-            if (_granted == true)
+            if (_granted == true && !widget.single)
               IconButton(
                 tooltip: 'Select all in this folder',
                 icon: const Icon(Icons.select_all),
@@ -211,7 +215,11 @@ class _PickFilesScreenState extends State<PickFilesScreen> with WidgetsBindingOb
               return FileTile(
                 item: item,
                 selected: _picked.containsKey(item.path),
-                onTap: () => item.isDirectory ? _load(item.path) : _toggle(item),
+                onTap: () => item.isDirectory
+                    ? _load(item.path)
+                    : widget.single
+                    ? Navigator.pop(context, [item])
+                    : _toggle(item),
                 onLongPress: item.isDirectory && !widget.selectFolders
                     ? null
                     : () => _toggle(item),

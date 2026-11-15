@@ -10,6 +10,7 @@ import 'category_screen.dart';
 import 'home_screen.dart';
 import 'search_screen.dart';
 import 'settings_screen.dart';
+import '../widgets/motion.dart';
 import 'storage_screen.dart';
 import 'tools_screen.dart';
 
@@ -101,15 +102,8 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     );
   }
 
-  void _toggleTheme(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    widget.themeController.setMode(isDark ? ThemeMode.light : ThemeMode.dark);
-  }
-
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Scaffold(
       appBar: AppBar(
         title: Text(
@@ -117,16 +111,14 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
           style: const TextStyle(fontWeight: FontWeight.w600),
         ),
         actions: [
-          IconButton(
-            tooltip: 'Search',
-            icon: const Icon(Icons.search),
-            onPressed: _openSearch,
-          ),
-          IconButton(
-            tooltip: isDark ? 'Switch to light theme' : 'Switch to dark theme',
-            icon: Icon(isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined),
-            onPressed: () => _toggleTheme(context),
-          ),
+          // Home has its own search bar and Tools its own tool search, so the
+          // app bar search only shows where there is no other one: Browse.
+          if (_index == 1)
+            IconButton(
+              tooltip: 'Search files',
+              icon: const Icon(Icons.search),
+              onPressed: _openSearch,
+            ),
           IconButton(
             tooltip: 'Settings',
             icon: const Icon(Icons.settings_outlined),
@@ -144,16 +136,25 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
       body: IndexedStack(
         index: _index,
         children: [
-          HomeScreen(
-            controller: _storage,
-            onOpenFolder: _openFolder,
-            onOpenStorage: () => _select(3),
-            onSearch: _openSearch,
-            onOpenCategory: _openCategory,
+          TabFade(
+            active: _index == 0,
+            child: HomeScreen(
+              controller: _storage,
+              onOpenFolder: _openFolder,
+              onOpenStorage: () => _select(3),
+              onSearch: _openSearch,
+              onOpenCategory: _openCategory,
+            ),
           ),
-          BrowseScreen(active: _index == 1, jumpTo: _jump, settings: widget.settings),
-          const ToolsScreen(),
-          StorageScreen(controller: _storage, onOpenCategory: _openCategory),
+          TabFade(
+            active: _index == 1,
+            child: BrowseScreen(active: _index == 1, jumpTo: _jump, settings: widget.settings),
+          ),
+          TabFade(active: _index == 2, child: ToolsScreen(settings: widget.settings)),
+          TabFade(
+            active: _index == 3,
+            child: StorageScreen(controller: _storage, onOpenCategory: _openCategory),
+          ),
         ],
       ),
       bottomNavigationBar: NavigationBar(

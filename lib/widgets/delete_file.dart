@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../models/file_item.dart';
 import '../services/trash_service.dart';
+import 'polo_message.dart';
 
 /// Asks before moving [item] to the trash. Returns true if it was moved.
 Future<bool> deleteFileWithConfirm(BuildContext context, FileItem item) async {
@@ -31,9 +32,7 @@ Future<bool> deleteFileWithConfirm(BuildContext context, FileItem item) async {
   if (ok != true || !context.mounted) return false;
 
   void toast(String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
+    showPoloMessage(context, message);
   }
 
   try {

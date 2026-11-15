@@ -1,12 +1,15 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 /// Shows a small blocking "working" dialog while [task] runs, then closes it
-/// and returns the task's result.
+/// and returns the task's result. [detail] can show a second line that the
+/// task updates as it goes, such as "2 of 5 · photo.jpg".
 Future<T> runWithProgress<T>(
     BuildContext context,
     String label,
-    Future<T> Function() task,
-    ) async {
+    Future<T> Function() task, {
+      ValueListenable<String>? detail,
+    }) async {
   showDialog<void>(
     context: context,
     barrierDismissible: false,
@@ -21,7 +24,36 @@ Future<T> runWithProgress<T>(
               child: CircularProgressIndicator(strokeWidth: 3),
             ),
             const SizedBox(width: 20),
-            Expanded(child: Text(label)),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label),
+                  if (detail != null)
+                    ValueListenableBuilder<String>(
+                      valueListenable: detail,
+                      builder: (context, text, _) => text.isEmpty
+                          ? const SizedBox.shrink()
+                          : Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          text,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurface
+                                .withValues(alpha: 0.6),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
           ],
         ),
       ),

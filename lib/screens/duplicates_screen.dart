@@ -11,6 +11,7 @@ import '../widgets/file_tile.dart';
 import '../widgets/message_view.dart';
 import '../widgets/open_file.dart';
 import '../widgets/progress_dialog.dart';
+import '../widgets/polo_message.dart';
 
 class DuplicatesScreen extends StatefulWidget {
   const DuplicatesScreen({super.key});
@@ -76,9 +77,7 @@ class _DuplicatesScreenState extends State<DuplicatesScreen> {
   }
 
   void _toast(String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
+    showPoloMessage(context, message);
   }
 
   Future<void> _trashSelected() async {

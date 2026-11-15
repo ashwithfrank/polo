@@ -1,257 +1,241 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 
-import '../models/file_item.dart';
-import '../services/convert_service.dart';
-import 'convert_images_screen.dart';
-import 'duplicates_screen.dart';
-import '../services/archive_service.dart';
-import '../services/file_service.dart';
-import '../widgets/name_dialog.dart';
-import '../widgets/progress_dialog.dart';
-import 'images_to_pdf_screen.dart';
-import 'pick_files_screen.dart';
+import '../services/settings_controller.dart';
+import '../tools/tool.dart';
+import '../widgets/motion.dart';
+import '../tools/tools_registry.dart';
 
-class ToolsScreen extends StatelessWidget {
-  const ToolsScreen({super.key});
+class ToolsScreen extends StatefulWidget {
+  const ToolsScreen({super.key, required this.settings});
 
-  Future<void> _convertImages(BuildContext context) async {
-    final picked = await Navigator.of(context).push<List<FileItem>>(
-      MaterialPageRoute(
-        builder: (_) => const PickFilesScreen(
-          title: 'Choose images',
-          accepts: ConvertService.canConvert,
-        ),
-      ),
-    );
-    if (picked == null || picked.isEmpty || !context.mounted) return;
-
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => ConvertImagesScreen(files: picked)),
-    );
-  }
-
-  Future<void> _imagesToPdf(BuildContext context) async {
-    final picked = await Navigator.of(context).push<List<FileItem>>(
-      MaterialPageRoute(
-        builder: (_) => const PickFilesScreen(
-          title: 'Choose images',
-          accepts: ConvertService.canConvert,
-        ),
-      ),
-    );
-    if (picked == null || picked.isEmpty || !context.mounted) return;
-
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => ImagesToPdfScreen(files: picked)),
-    );
-  }
-
-  Future<void> _zipTools(BuildContext context) async {
-    final choice = await showModalBottomSheet<String>(
-      context: context,
-      showDragHandle: true,
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.folder_zip_outlined),
-              title: const Text('Create a ZIP'),
-              subtitle: const Text('Compress files and folders'),
-              onTap: () => Navigator.pop(context, 'create'),
-            ),
-            ListTile(
-              leading: const Icon(Icons.unarchive_outlined),
-              title: const Text('Extract a ZIP'),
-              subtitle: const Text('Unpack a .zip file'),
-              onTap: () => Navigator.pop(context, 'extract'),
-            ),
-          ],
-        ),
-      ),
-    );
-    if (choice == null || !context.mounted) return;
-
-    final service = ArchiveService(FileService());
-    void toast(String message) {
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text(message)));
-    }
-
-    if (choice == 'create') {
-      final picked = await Navigator.of(context).push<List<FileItem>>(
-        MaterialPageRoute(
-          builder: (_) => const PickFilesScreen(
-            title: 'Choose items to compress',
-            accepts: _acceptAll,
-            selectFolders: true,
-          ),
-        ),
-      );
-      if (picked == null || picked.isEmpty || !context.mounted) return;
-
-      final first = picked.first;
-      final dot = first.name.lastIndexOf('.');
-      final base = first.isDirectory || dot <= 0 ? first.name : first.name.substring(0, dot);
-
-      final name = await showDialog<String>(
-        context: context,
-        builder: (_) => NameDialog(
-          title: 'Compress to ZIP',
-          confirmLabel: 'Compress',
-          initial: picked.length == 1 ? base : 'Archive',
-          hint: 'File name',
-          suffix: '.zip',
-          existing: const {},
-        ),
-      );
-      if (name == null || !context.mounted) return;
-
-      try {
-        final out = await runWithProgress(
-          context,
-          'Compressing…',
-              () => service.createZip(picked, first.parentPath, '$name.zip'),
-        );
-        if (context.mounted) toast('Created ${out.split('/').last}');
-      } catch (e) {
-        if (context.mounted) {
-          toast(e is FileSystemException ? e.message : "Couldn't create the ZIP");
-        }
-      }
-    } else {
-      final picked = await Navigator.of(context).push<List<FileItem>>(
-        MaterialPageRoute(
-          builder: (_) => const PickFilesScreen(
-            title: 'Choose a ZIP file',
-            accepts: _isZip,
-          ),
-        ),
-      );
-      if (picked == null || picked.isEmpty || !context.mounted) return;
-
-      var done = 0;
-      String? lastFolder;
-      String? error;
-      await runWithProgress(context, 'Extracting…', () async {
-        for (final zip in picked) {
-          try {
-            final result = await service.extractZip(zip);
-            lastFolder = result.folderName;
-            done++;
-          } catch (_) {
-            error = "Couldn't extract ${zip.name}. It may be damaged or password protected.";
-          }
-        }
-      });
-      if (!context.mounted) return;
-      toast(error ??
-          (done == 1 ? 'Extracted to $lastFolder' : 'Extracted $done ZIP files'));
-    }
-  }
+  final SettingsController settings;
 
   @override
-  Widget build(BuildContext context) {
-    return GridView.count(
-      padding: const EdgeInsets.all(16),
-      crossAxisCount: 2,
-      mainAxisSpacing: 12,
-      crossAxisSpacing: 12,
-      childAspectRatio: 1.05,
-      children: [
-        _ToolCard(
-          icon: Icons.transform,
-          title: 'Convert images',
-          subtitle: 'PNG and JPG',
-          onTap: () => _convertImages(context),
-        ),
-        _ToolCard(
-          icon: Icons.picture_as_pdf_outlined,
-          title: 'Images to PDF',
-          subtitle: 'Combine images',
-          onTap: () => _imagesToPdf(context),
-        ),
-        _ToolCard(
-          icon: Icons.folder_zip_outlined,
-          title: 'Zip and unzip',
-          subtitle: 'Compress and extract',
-          onTap: () => _zipTools(context),
-        ),
-        _ToolCard(
-          icon: Icons.content_copy_outlined,
-          title: 'Duplicate finder',
-          subtitle: 'Free up space',
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const DuplicatesScreen()),
-          ),
-        ),
-        const _ToolCard(
-          icon: Icons.audiotrack_outlined,
-          title: 'Video to audio',
-          subtitle: '',
-        ),
-      ],
-    );
-  }
+  State<ToolsScreen> createState() => _ToolsScreenState();
 }
 
-bool _acceptAll(FileItem item) => true;
+class _ToolsScreenState extends State<ToolsScreen> {
+  final _search = TextEditingController();
+  String _query = '';
 
-bool _isZip(FileItem item) => !item.isDirectory && item.extension == 'zip';
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
 
-class _ToolCard extends StatelessWidget {
-  const _ToolCard({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    this.onTap,
-  });
+  Widget _header(BuildContext context, String text) {
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+        child: Text(
+          text,
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+        ),
+      ),
+    );
+  }
 
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final VoidCallback? onTap;
+  Widget _grid(List<Tool> tools) {
+    return SliverPadding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      sliver: SliverGrid.builder(
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          mainAxisSpacing: 12,
+          crossAxisSpacing: 12,
+          childAspectRatio: 1.25,
+        ),
+        itemCount: tools.length,
+        itemBuilder: (context, i) {
+          final tool = tools[i];
+          return Reveal(
+            index: i,
+            child: _ToolCard(
+              tool: tool,
+              favorite: widget.settings.isFavoriteTool(tool.id),
+              onToggleFavorite: () => widget.settings.toggleFavoriteTool(tool.id),
+            ),
+          );
+        },
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final enabled = onTap != null;
+
+    return ListenableBuilder(
+      listenable: widget.settings,
+      builder: (context, _) {
+        final searching = _query.trim().isNotEmpty;
+        final found = allTools.where((t) => t.matches(_query)).toList();
+        final ready = found.where((t) => !t.comingSoon).toList();
+        final soon = found.where((t) => t.comingSoon).toList();
+
+        final slivers = <Widget>[
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+              child: TextField(
+                controller: _search,
+                onChanged: (v) => setState(() => _query = v),
+                textInputAction: TextInputAction.search,
+                decoration: InputDecoration(
+                  hintText: 'Search tools',
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: searching
+                      ? IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () {
+                      _search.clear();
+                      setState(() => _query = '');
+                    },
+                  )
+                      : null,
+                  filled: true,
+                  fillColor: scheme.surfaceContainerHighest,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(28),
+                    borderSide: BorderSide.none,
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                ),
+              ),
+            ),
+          ),
+        ];
+
+        if (found.isEmpty) {
+          slivers.add(
+            const SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(child: Text('No tools match your search')),
+            ),
+          );
+        } else if (searching) {
+          // One flat list while searching.
+          slivers
+            ..add(const SliverToBoxAdapter(child: SizedBox(height: 16)))
+            ..add(_grid([...ready, ...soon]));
+        } else {
+          final favorites = ready.where((t) => widget.settings.isFavoriteTool(t.id)).toList();
+          if (favorites.isNotEmpty) {
+            slivers
+              ..add(_header(context, 'Favorites'))
+              ..add(_grid(favorites));
+          }
+          for (final category in ToolCategory.values) {
+            final inCategory = ready.where((t) => t.category == category).toList();
+            if (inCategory.isEmpty) continue;
+            slivers
+              ..add(_header(context, category.label))
+              ..add(_grid(inCategory));
+          }
+          if (soon.isNotEmpty) {
+            slivers
+              ..add(_header(context, 'Coming soon'))
+              ..add(_grid(soon));
+          }
+        }
+        slivers.add(const SliverToBoxAdapter(child: SizedBox(height: 24)));
+
+        return CustomScrollView(slivers: slivers);
+      },
+    );
+  }
+}
+
+class _ToolCard extends StatelessWidget {
+  const _ToolCard({
+    required this.tool,
+    required this.favorite,
+    required this.onToggleFavorite,
+  });
+
+  final Tool tool;
+  final bool favorite;
+  final VoidCallback onToggleFavorite;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final enabled = !tool.comingSoon;
 
     return Opacity(
       opacity: enabled ? 1 : 0.55,
-      child: Material(
-        color: scheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(16),
-        child: InkWell(
+      child: PressScale(
+        child: Material(
+          color: scheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(16),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: enabled ? () => tool.run!(context) : null,
+            onLongPress: enabled ? onToggleFavorite : null,
+            child: Stack(
               children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: scheme.primaryContainer,
-                    borderRadius: BorderRadius.circular(12),
+                Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 42,
+                        height: 42,
+                        decoration: BoxDecoration(
+                          color: scheme.primaryContainer,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(tool.icon, color: scheme.primary),
+                      ),
+                      const Spacer(),
+                      Text(
+                        tool.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        enabled ? tool.subtitle : 'Coming soon',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: scheme.onSurface.withValues(alpha: 0.6),
+                        ),
+                      ),
+                    ],
                   ),
-                  child: Icon(icon, color: scheme.primary),
                 ),
-                const Spacer(),
-                Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 2),
-                Text(
-                  enabled ? subtitle : 'Coming soon',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: scheme.onSurface.withValues(alpha: 0.6),
+                if (enabled)
+                  Positioned(
+                    top: 2,
+                    right: 2,
+                    child: IconButton(
+                      tooltip: favorite ? 'Remove from favorites' : 'Add to favorites',
+                      visualDensity: VisualDensity.compact,
+                      icon: AnimatedSwitcher(
+                        duration: motion(context, 220),
+                        switchInCurve: Curves.easeOutBack,
+                        transitionBuilder: (child, animation) =>
+                            ScaleTransition(scale: animation, child: child),
+                        child: Icon(
+                          favorite ? Icons.star_rounded : Icons.star_outline_rounded,
+                          key: ValueKey(favorite),
+                          size: 22,
+                          color: favorite
+                              ? scheme.primary
+                              : scheme.onSurface.withValues(alpha: 0.4),
+                        ),
+                      ),
+                      onPressed: onToggleFavorite,
+                    ),
                   ),
-                ),
               ],
             ),
           ),

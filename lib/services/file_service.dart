@@ -10,10 +10,10 @@ class FileService {
   /// Lists a directory: folders first, then files, in the chosen order.
   /// Throws [FileSystemException] if the directory can't be read.
   Future<List<FileItem>> list(
-    String path, {
-    required SortBy sortBy,
-    required bool showHidden,
-  }) async {
+      String path, {
+        required SortBy sortBy,
+        required bool showHidden,
+      }) async {
     final items = <FileItem>[];
 
     await for (final entity in Directory(path).list(followLinks: false)) {
@@ -147,6 +147,15 @@ class FileService {
   }
 
   Future<void> delete(FileItem item) => _deletePath(item);
+
+  /// Creates an empty file. Throws if the name is already taken.
+  Future<void> createFile(String parent, String name) async {
+    final target = '$parent/$name';
+    if (await _exists(target)) {
+      throw FileSystemException('That name is already taken', target);
+    }
+    await File(target).create();
+  }
 
   Future<void> createFolder(String parent, String name) async {
     final target = '$parent/$name';

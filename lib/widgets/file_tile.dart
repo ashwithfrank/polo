@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'motion.dart';
 import '../models/file_item.dart';
 import 'file_thumb.dart';
 
@@ -67,7 +68,11 @@ class FileTile extends StatelessWidget {
       trailing: trailing,
       selectedTileColor: scheme.primaryContainer.withValues(alpha: 0.7),
       leading: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 150),
+        duration: motion(context, 200),
+        transitionBuilder: (child, animation) => ScaleTransition(
+          scale: Tween<double>(begin: 0.6, end: 1).animate(animation),
+          child: FadeTransition(opacity: animation, child: child),
+        ),
         child: leading,
       ),
       title: Text(item.name, maxLines: 1, overflow: TextOverflow.ellipsis),
