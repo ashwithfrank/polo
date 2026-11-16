@@ -2,9 +2,13 @@ import 'package:flutter/material.dart';
 
 import '../services/settings_controller.dart';
 import '../tools/tool.dart';
-import '../widgets/motion.dart';
 import '../tools/tools_registry.dart';
+import '../widgets/motion.dart';
+import '../widgets/tool_card.dart';
+import 'tool_category_screen.dart';
 
+/// The Tools tab: one card per kind of tool. Tapping a card opens that
+/// group's tools. Searching shows matching tools from every group at once.
 class ToolsScreen extends StatefulWidget {
   const ToolsScreen({super.key, required this.settings});
 
@@ -39,7 +43,7 @@ class _ToolsScreenState extends State<ToolsScreen> {
     );
   }
 
-  Widget _grid(List<Tool> tools) {
+  Widget _toolGrid(List<Tool> tools) {
     return SliverPadding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       sliver: SliverGrid.builder(
@@ -54,10 +58,42 @@ class _ToolsScreenState extends State<ToolsScreen> {
           final tool = tools[i];
           return Reveal(
             index: i,
-            child: _ToolCard(
+            child: ToolCard(
               tool: tool,
               favorite: widget.settings.isFavoriteTool(tool.id),
               onToggleFavorite: () => widget.settings.toggleFavoriteTool(tool.id),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _categoryGrid(List<ToolCategory> categories) {
+    return SliverPadding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      sliver: SliverGrid.builder(
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          mainAxisSpacing: 12,
+          crossAxisSpacing: 12,
+          childAspectRatio: 1.05,
+        ),
+        itemCount: categories.length,
+        itemBuilder: (context, i) {
+          final category = categories[i];
+          final count =
+              allTools.where((t) => t.category == category && !t.comingSoon).length;
+          return Reveal(
+            index: i,
+            child: _CategoryCard(
+              category: category,
+              count: count,
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => ToolCategoryScreen(category: category, settings: widget.settings),
+                ),
+              ),
             ),
           );
         },
@@ -110,37 +146,33 @@ class _ToolsScreenState extends State<ToolsScreen> {
           ),
         ];
 
-        if (found.isEmpty) {
-          slivers.add(
-            const SliverFillRemaining(
-              hasScrollBody: false,
-              child: Center(child: Text('No tools match your search')),
-            ),
-          );
-        } else if (searching) {
-          // One flat list while searching.
-          slivers
-            ..add(const SliverToBoxAdapter(child: SizedBox(height: 16)))
-            ..add(_grid([...ready, ...soon]));
+        if (searching) {
+          if (found.isEmpty) {
+            slivers.add(
+              const SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(child: Text('No tools match your search')),
+              ),
+            );
+          } else {
+            slivers
+              ..add(const SliverToBoxAdapter(child: SizedBox(height: 16)))
+              ..add(_toolGrid([...ready, ...soon]));
+          }
         } else {
           final favorites = ready.where((t) => widget.settings.isFavoriteTool(t.id)).toList();
           if (favorites.isNotEmpty) {
             slivers
               ..add(_header(context, 'Favorites'))
-              ..add(_grid(favorites));
+              ..add(_toolGrid(favorites));
           }
-          for (final category in ToolCategory.values) {
-            final inCategory = ready.where((t) => t.category == category).toList();
-            if (inCategory.isEmpty) continue;
-            slivers
-              ..add(_header(context, category.label))
-              ..add(_grid(inCategory));
-          }
-          if (soon.isNotEmpty) {
-            slivers
-              ..add(_header(context, 'Coming soon'))
-              ..add(_grid(soon));
-          }
+          final categories = [
+            for (final c in ToolCategory.values)
+              if (allTools.any((t) => t.category == c)) c,
+          ];
+          slivers
+            ..add(_header(context, 'All tools'))
+            ..add(_categoryGrid(categories));
         }
         slivers.add(const SliverToBoxAdapter(child: SizedBox(height: 24)));
 
@@ -150,92 +182,60 @@ class _ToolsScreenState extends State<ToolsScreen> {
   }
 }
 
-class _ToolCard extends StatelessWidget {
-  const _ToolCard({
-    required this.tool,
-    required this.favorite,
-    required this.onToggleFavorite,
-  });
+class _CategoryCard extends StatelessWidget {
+  const _CategoryCard({required this.category, required this.count, required this.onTap});
 
-  final Tool tool;
-  final bool favorite;
-  final VoidCallback onToggleFavorite;
+  final ToolCategory category;
+  final int count;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final enabled = !tool.comingSoon;
 
-    return Opacity(
-      opacity: enabled ? 1 : 0.55,
-      child: PressScale(
-        child: Material(
-          color: scheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(16),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(16),
-            onTap: enabled ? () => tool.run!(context) : null,
-            onLongPress: enabled ? onToggleFavorite : null,
-            child: Stack(
+    return PressScale(
+      child: Material(
+        color: scheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(20),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Padding(
-                  padding: const EdgeInsets.all(14),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        width: 42,
-                        height: 42,
-                        decoration: BoxDecoration(
-                          color: scheme.primaryContainer,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Icon(tool.icon, color: scheme.primary),
-                      ),
-                      const Spacer(),
-                      Text(
-                        tool.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        enabled ? tool.subtitle : 'Coming soon',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: scheme.onSurface.withValues(alpha: 0.6),
-                        ),
-                      ),
-                    ],
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: scheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(category.icon, color: scheme.primary, size: 26),
+                ),
+                const Spacer(),
+                Text(
+                  category.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  category.blurb,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: scheme.onSurface.withValues(alpha: 0.6),
                   ),
                 ),
-                if (enabled)
-                  Positioned(
-                    top: 2,
-                    right: 2,
-                    child: IconButton(
-                      tooltip: favorite ? 'Remove from favorites' : 'Add to favorites',
-                      visualDensity: VisualDensity.compact,
-                      icon: AnimatedSwitcher(
-                        duration: motion(context, 220),
-                        switchInCurve: Curves.easeOutBack,
-                        transitionBuilder: (child, animation) =>
-                            ScaleTransition(scale: animation, child: child),
-                        child: Icon(
-                          favorite ? Icons.star_rounded : Icons.star_outline_rounded,
-                          key: ValueKey(favorite),
-                          size: 22,
-                          color: favorite
-                              ? scheme.primary
-                              : scheme.onSurface.withValues(alpha: 0.4),
-                        ),
-                      ),
-                      onPressed: onToggleFavorite,
-                    ),
-                  ),
+                const SizedBox(height: 6),
+                Text(
+                  '$count ${count == 1 ? 'tool' : 'tools'}',
+                  style: TextStyle(fontSize: 12, color: scheme.primary),
+                ),
               ],
             ),
           ),

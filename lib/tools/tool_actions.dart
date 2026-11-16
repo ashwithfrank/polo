@@ -1,12 +1,27 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
 
 import '../models/file_item.dart';
+import '../screens/apk_analyzer_screen.dart';
 import '../screens/batch_rename_screen.dart';
 import '../screens/checksum_screen.dart';
 import '../screens/convert_images_screen.dart';
+import '../screens/edit_image_screen.dart';
+import '../screens/photo_info_screen.dart';
+import '../screens/strip_metadata_screen.dart';
+import '../services/image_edit_service.dart';
+import '../services/image_meta.dart';
 import '../screens/images_to_pdf_screen.dart';
+import '../screens/pdf_merge_screen.dart';
+import '../screens/pdf_organize_screen.dart';
+import '../screens/pdf_split_screen.dart';
+import '../screens/pdf_to_images_screen.dart';
+import '../screens/text_to_pdf_screen.dart';
+import '../services/pdf_tools_service.dart';
+import '../widgets/open_file.dart';
+import '../widgets/pdf_result.dart';
 import '../screens/pick_files_screen.dart';
 import '../services/archive_service.dart';
 import '../services/convert_service.dart';
@@ -208,3 +223,251 @@ Future<void> runChecksum(BuildContext context) async {
 bool _acceptAll(FileItem item) => true;
 
 bool _isZip(FileItem item) => !item.isDirectory && item.extension == 'zip';
+
+Future<void> runCompressForSharing(BuildContext context) async {
+  final picked = await Navigator.of(context).push<List<FileItem>>(
+    MaterialPageRoute(
+      builder: (_) => const PickFilesScreen(
+        title: 'Choose photos',
+        accepts: ConvertService.canConvert,
+      ),
+    ),
+  );
+  if (picked == null || picked.isEmpty || !context.mounted) return;
+
+  await Navigator.of(context).push(
+    MaterialPageRoute(
+      builder: (_) => ConvertImagesScreen(files: picked, keepFormat: true, share: true),
+    ),
+  );
+}
+
+Future<void> runEditImage(BuildContext context) async {
+  final picked = await Navigator.of(context).push<List<FileItem>>(
+    MaterialPageRoute(
+      builder: (_) => const PickFilesScreen(
+        title: 'Choose a picture',
+        accepts: EditImageService.canEdit,
+        single: true,
+      ),
+    ),
+  );
+  if (picked == null || picked.isEmpty || !context.mounted) return;
+
+  await Navigator.of(context).push(
+    MaterialPageRoute(builder: (_) => EditImageScreen(item: picked.first)),
+  );
+}
+
+Future<void> runPhotoInfo(BuildContext context) async {
+  final picked = await Navigator.of(context).push<List<FileItem>>(
+    MaterialPageRoute(
+      builder: (_) => const PickFilesScreen(
+        title: 'Choose a photo',
+        accepts: ConvertService.canConvert,
+        single: true,
+      ),
+    ),
+  );
+  if (picked == null || picked.isEmpty || !context.mounted) return;
+
+  await Navigator.of(context).push(
+    MaterialPageRoute(builder: (_) => PhotoInfoScreen(item: picked.first)),
+  );
+}
+
+bool _canStrip(FileItem item) =>
+    !item.isDirectory && strippableExtensions.contains(item.extension);
+
+Future<void> runStripMetadata(BuildContext context) async {
+  final picked = await Navigator.of(context).push<List<FileItem>>(
+    MaterialPageRoute(
+      builder: (_) => const PickFilesScreen(
+        title: 'Choose pictures',
+        accepts: _canStrip,
+      ),
+    ),
+  );
+  if (picked == null || picked.isEmpty || !context.mounted) return;
+
+  await Navigator.of(context).push(
+    MaterialPageRoute(builder: (_) => StripMetadataScreen(files: picked)),
+  );
+}
+
+// ---------- PDF tools ----------
+
+bool _isPdf(FileItem item) => !item.isDirectory && item.extension == 'pdf';
+
+Future<List<FileItem>?> _pickPdfs(
+    BuildContext context, {
+      required String title,
+      bool single = false,
+    }) {
+  return Navigator.of(context).push<List<FileItem>>(
+    MaterialPageRoute(
+      builder: (_) => PickFilesScreen(title: title, accepts: _isPdf, single: single),
+    ),
+  );
+}
+
+Future<void> runMergePdfs(BuildContext context) async {
+  final picked = await _pickPdfs(context, title: 'Choose PDFs to merge');
+  if (picked == null || picked.isEmpty || !context.mounted) return;
+  await Navigator.of(context).push(
+    MaterialPageRoute(builder: (_) => PdfMergeScreen(files: picked)),
+  );
+}
+
+Future<void> runSplitPdf(BuildContext context) async {
+  final picked = await _pickPdfs(context, title: 'Choose a PDF', single: true);
+  if (picked == null || picked.isEmpty || !context.mounted) return;
+  await Navigator.of(context).push(
+    MaterialPageRoute(builder: (_) => PdfSplitScreen(item: picked.first)),
+  );
+}
+
+Future<void> runOrganizePdf(BuildContext context) async {
+  final picked = await _pickPdfs(context, title: 'Choose a PDF', single: true);
+  if (picked == null || picked.isEmpty || !context.mounted) return;
+  await Navigator.of(context).push(
+    MaterialPageRoute(builder: (_) => PdfOrganizeScreen(item: picked.first)),
+  );
+}
+
+Future<void> runPdfToImages(BuildContext context) async {
+  final picked = await _pickPdfs(context, title: 'Choose a PDF', single: true);
+  if (picked == null || picked.isEmpty || !context.mounted) return;
+  await Navigator.of(context).push(
+    MaterialPageRoute(builder: (_) => PdfToImagesScreen(item: picked.first)),
+  );
+}
+
+Future<void> runPdfToText(BuildContext context) async {
+  final picked = await _pickPdfs(context, title: 'Choose a PDF', single: true);
+  if (picked == null || picked.isEmpty || !context.mounted) return;
+
+  final detail = ValueNotifier<String>('');
+  try {
+    final result = await runWithProgress(
+      context,
+      'Reading text…',
+          () => PdfToolsService(FileService()).toText(
+        picked.first.path,
+        onProgress: (done, total) => detail.value = 'Page $done of $total',
+      ),
+      detail: detail,
+    );
+    if (!context.mounted) return;
+    showPoloMessage(
+      context,
+      'Saved ${result.path.split('/').last}',
+      actionLabel: 'Open',
+      onAction: () => openFile(
+        context,
+        FileItem(
+          path: result.path,
+          name: result.path.split('/').last,
+          isDirectory: false,
+          size: 0,
+          modified: DateTime.now(),
+        ),
+      ),
+    );
+  } catch (e) {
+    if (!context.mounted) return;
+    showPoloMessage(
+      context,
+      e is FormatException ? e.message : "Couldn't read this PDF",
+    );
+  } finally {
+    detail.dispose();
+  }
+}
+
+const _textExtensions = {
+  'txt', 'md', 'markdown', 'csv', 'json', 'log', 'xml', 'yml', 'yaml', 'ini', 'html',
+};
+
+bool _isTextFile(FileItem item) =>
+    !item.isDirectory && _textExtensions.contains(item.extension);
+
+Future<void> runTextToPdf(BuildContext context) async {
+  final fromFile = await showModalBottomSheet<bool>(
+    context: context,
+    showDragHandle: true,
+    builder: (sheet) => SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(
+            leading: const Icon(Icons.description_outlined),
+            title: const Text('From a text or Markdown file'),
+            onTap: () => Navigator.pop(sheet, true),
+          ),
+          ListTile(
+            leading: const Icon(Icons.edit_note),
+            title: const Text('Type or paste text'),
+            onTap: () => Navigator.pop(sheet, false),
+          ),
+        ],
+      ),
+    ),
+  );
+  if (fromFile == null || !context.mounted) return;
+
+  if (!fromFile) {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const TextToPdfScreen()),
+    );
+    return;
+  }
+
+  final picked = await Navigator.of(context).push<List<FileItem>>(
+    MaterialPageRoute(
+      builder: (_) => const PickFilesScreen(
+        title: 'Choose a text file',
+        accepts: _isTextFile,
+        single: true,
+      ),
+    ),
+  );
+  if (picked == null || picked.isEmpty || !context.mounted) return;
+
+  final item = picked.first;
+  if (item.size > 2 * 1024 * 1024) {
+    showPoloMessage(context, 'That file is too big (2 MB is the limit)');
+    return;
+  }
+  final text = utf8.decode(await File(item.path).readAsBytes(), allowMalformed: true);
+  if (!context.mounted) return;
+
+  final isMarkdown = item.extension == 'md' || item.extension == 'markdown';
+  await Navigator.of(context).push(
+    MaterialPageRoute(
+      builder: (_) => TextToPdfScreen(
+        initialText: text,
+        name: baseName(item.name),
+        dir: item.parentPath,
+        markdown: isMarkdown,
+      ),
+    ),
+  );
+}
+
+Future<void> runApkAnalyzer(BuildContext context) async {
+  final picked = await Navigator.of(context).push<List<FileItem>>(
+    MaterialPageRoute(
+      builder: (_) => PickFilesScreen(
+        title: 'Choose an APK',
+        accepts: (item) => item.extension == 'apk',
+        single: true,
+      ),
+    ),
+  );
+  if (picked == null || picked.isEmpty || !context.mounted) return;
+
+  await Navigator.of(context).push(
+    MaterialPageRoute(builder: (_) => ApkAnalyzerScreen(item: picked.first)),
+  );
+}

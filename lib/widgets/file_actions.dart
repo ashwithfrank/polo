@@ -103,7 +103,7 @@ Future<bool> zipFiles(BuildContext context, List<FileItem> items) async {
   try {
     final out = await runWithProgress(
       context,
-      'Compressing…',
+      'Compressing to $name.zip…',
           () => ArchiveService(FileService()).createZip(items, first.parentPath, '$name.zip'),
     );
     if (context.mounted) _toast(context, 'Created ${out.split('/').last}');

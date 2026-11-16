@@ -22,6 +22,8 @@ class _ImagesToPdfScreenState extends State<ImagesToPdfScreen> {
   late final TextEditingController _name = TextEditingController(text: _defaultName());
 
   PdfPageMode _mode = PdfPageMode.a4;
+  PdfOrientation _orientation = PdfOrientation.auto;
+  PdfMargin _margin = PdfMargin.normal;
   double _quality = 85;
   bool _busy = false;
   String? _nameError;
@@ -76,6 +78,8 @@ class _ImagesToPdfScreenState extends State<ImagesToPdfScreen> {
         fileName: '$name.pdf',
         mode: _mode,
         quality: _quality.round(),
+        orientation: _orientation,
+        margin: _margin,
       );
     } catch (e) {
       error = e is FormatException ? e.message : "Couldn't create the PDF";
@@ -216,15 +220,52 @@ class _ImagesToPdfScreenState extends State<ImagesToPdfScreen> {
         ],
         Text('Page size', style: titleStyle),
         const SizedBox(height: 8),
-        SegmentedButton<PdfPageMode>(
-          showSelectedIcon: false,
-          segments: const [
-            ButtonSegment(value: PdfPageMode.a4, label: Text('A4')),
-            ButtonSegment(value: PdfPageMode.fit, label: Text('Fit to image')),
+        Wrap(
+          spacing: 8,
+          runSpacing: 4,
+          children: [
+            for (final m in PdfPageMode.values)
+              ChoiceChip(
+                label: Text(switch (m) {
+                  PdfPageMode.a4 => 'A4',
+                  PdfPageMode.a5 => 'A5',
+                  PdfPageMode.letter => 'Letter',
+                  PdfPageMode.fit => 'Fit to image',
+                }),
+                selected: _mode == m,
+                onSelected: locked ? null : (_) => setState(() => _mode = m),
+              ),
           ],
-          selected: {_mode},
-          onSelectionChanged: locked ? null : (s) => setState(() => _mode = s.first),
         ),
+        if (_mode != PdfPageMode.fit) ...[
+          const SizedBox(height: 16),
+          Text('Orientation', style: titleStyle),
+          const SizedBox(height: 8),
+          SegmentedButton<PdfOrientation>(
+            showSelectedIcon: false,
+            segments: const [
+              ButtonSegment(value: PdfOrientation.auto, label: Text('Auto')),
+              ButtonSegment(value: PdfOrientation.portrait, label: Text('Portrait')),
+              ButtonSegment(value: PdfOrientation.landscape, label: Text('Landscape')),
+            ],
+            selected: {_orientation},
+            onSelectionChanged: locked ? null : (s) => setState(() => _orientation = s.first),
+          ),
+          const SizedBox(height: 16),
+          Text('Margins', style: titleStyle),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            children: [
+              for (final m in PdfMargin.values)
+                ChoiceChip(
+                  label: Text(m.label),
+                  selected: _margin == m,
+                  onSelected: locked ? null : (_) => setState(() => _margin = m),
+                ),
+            ],
+          ),
+        ],
         const SizedBox(height: 16),
         Row(
           children: [

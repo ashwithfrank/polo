@@ -30,6 +30,7 @@ class BrowseScreen extends StatefulWidget {
     required this.active,
     required this.settings,
     this.jumpTo,
+    this.handlesBack,
   });
 
   /// True while this tab is the visible one. Used so the system back button
@@ -38,6 +39,10 @@ class BrowseScreen extends StatefulWidget {
 
   /// Set a folder path on this notifier to make Browse open that folder.
   final ValueNotifier<String?>? jumpTo;
+
+  /// Tells the app shell whether Browse wants the back button right now (it
+  /// is inside a folder or selecting), so the shell doesn't also act on it.
+  final ValueNotifier<bool>? handlesBack;
 
   /// Sort order and hidden-files choice, saved between launches.
   final SettingsController settings;
@@ -420,11 +425,14 @@ class _BrowseScreenState extends State<BrowseScreen> with WidgetsBindingObserver
     );
     if (name == null || !mounted) return;
 
-    setState(() => _loading = true);
     String? created;
     String? error;
     try {
-      created = await _archive.createZip(items, _path, '$name.zip');
+      created = await runWithProgress(
+        context,
+        'Compressing to $name.zip…',
+            () => _archive.createZip(items, _path, '$name.zip'),
+      );
     } on FileSystemException catch (e) {
       error = e.message;
     } catch (_) {
@@ -438,11 +446,14 @@ class _BrowseScreenState extends State<BrowseScreen> with WidgetsBindingObserver
   }
 
   Future<void> _unzip(FileItem item) async {
-    setState(() => _loading = true);
     ExtractResult? result;
     String? error;
     try {
-      result = await _archive.extractZip(item);
+      result = await runWithProgress(
+        context,
+        'Extracting ${item.name}…',
+            () => _archive.extractZip(item),
+      );
     } catch (_) {
       error = "Couldn't extract this ZIP. It may be damaged or password protected.";
     }
@@ -667,6 +678,12 @@ class _BrowseScreenState extends State<BrowseScreen> with WidgetsBindingObserver
     }
     if (_granted == false) {
       return _PermissionPrompt(onGrant: _requestPermission);
+    }
+
+    final handles = widget.active && !(_atRoot && !_selecting);
+    final guard = widget.handlesBack;
+    if (guard != null && guard.value != handles) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => guard.value = handles);
     }
 
     return PopScope(

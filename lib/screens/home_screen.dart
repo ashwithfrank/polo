@@ -18,6 +18,7 @@ class HomeScreen extends StatelessWidget {
     required this.onOpenStorage,
     required this.onSearch,
     required this.onOpenCategory,
+    required this.onOpenVault,
   });
 
   final StorageController controller;
@@ -25,6 +26,7 @@ class HomeScreen extends StatelessWidget {
   final VoidCallback onOpenStorage;
   final VoidCallback onSearch;
   final void Function(StorageCategory category) onOpenCategory;
+  final VoidCallback onOpenVault;
 
   @override
   Widget build(BuildContext context) {
@@ -60,6 +62,8 @@ class HomeScreen extends StatelessWidget {
                   onTap: onOpenStorage,
                 ),
               ),
+              const SizedBox(height: 12),
+              Reveal(index: 2, child: _VaultCard(onTap: onOpenVault)),
               const SizedBox(height: 24),
               Reveal(index: 2, child: Text('Categories', style: titleStyle)),
               const SizedBox(height: 10),
@@ -300,6 +304,60 @@ class _QuickTile extends StatelessWidget {
             const SizedBox(height: 8),
             Text(label, style: const TextStyle(fontSize: 12)),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _VaultCard extends StatelessWidget {
+  const _VaultCard({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return PressScale(
+      child: Material(
+        color: scheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(20),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: scheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(Icons.lock_outline, color: scheme.primary),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Vault', style: TextStyle(fontWeight: FontWeight.w600)),
+                      Text(
+                        'Keep private files locked with a password',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: scheme.onSurface.withValues(alpha: 0.6),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right, color: scheme.onSurface.withValues(alpha: 0.5)),
+              ],
+            ),
+          ),
         ),
       ),
     );

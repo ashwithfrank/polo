@@ -7,7 +7,20 @@ import 'package:pdf/widgets.dart' as pw;
 
 import 'file_service.dart';
 
-enum PdfPageMode { a4, fit }
+enum PdfPageMode { a4, a5, letter, fit }
+
+enum PdfOrientation { auto, portrait, landscape }
+
+enum PdfMargin {
+  none(0, 'None'),
+  small(12, 'Small'),
+  normal(24, 'Normal'),
+  large(48, 'Large');
+
+  const PdfMargin(this.points, this.label);
+  final double points;
+  final String label;
+}
 
 class PdfService {
   PdfService(this._files);
@@ -22,10 +35,14 @@ class PdfService {
     required String fileName,
     required PdfPageMode mode,
     required int quality,
+    PdfOrientation orientation = PdfOrientation.auto,
+    PdfMargin margin = PdfMargin.normal,
   }) async {
     final outPath = await _files.uniquePath(dir, fileName);
     // Decoding photos is heavy, so build the whole PDF off the UI thread.
-    await Isolate.run(() => _buildPdf(imagePaths, outPath, mode, quality));
+    await Isolate.run(
+          () => _buildPdf(imagePaths, outPath, mode, quality, orientation, margin),
+    );
     return outPath;
   }
 }
@@ -35,6 +52,8 @@ Future<void> _buildPdf(
     String outPath,
     PdfPageMode mode,
     int quality,
+    PdfOrientation orientation,
+    PdfMargin pageMargin,
     ) async {
   final doc = pw.Document();
 
@@ -59,9 +78,19 @@ Future<void> _buildPdf(
 
     final PdfPageFormat format;
     final double margin;
-    if (mode == PdfPageMode.a4) {
-      format = w > h ? PdfPageFormat.a4.landscape : PdfPageFormat.a4;
-      margin = 24;
+    if (mode != PdfPageMode.fit) {
+      final base = switch (mode) {
+        PdfPageMode.a5 => PdfPageFormat.a5,
+        PdfPageMode.letter => PdfPageFormat.letter,
+        _ => PdfPageFormat.a4,
+      };
+      final landscape = switch (orientation) {
+        PdfOrientation.auto => w > h,
+        PdfOrientation.portrait => false,
+        PdfOrientation.landscape => true,
+      };
+      format = landscape ? base.landscape : base.portrait;
+      margin = pageMargin.points;
     } else {
       // Page matches the image's shape, with the long side set to A4's.
       const longSide = 842.0;

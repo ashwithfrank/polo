@@ -5,9 +5,18 @@ import '../devtools/dev_logic.dart';
 import '../devtools/password_screen.dart';
 import '../devtools/regex_screen.dart';
 import '../devtools/text_tool_screen.dart';
+import '../models/file_item.dart';
+import '../screens/cleanup_screen.dart';
 import '../screens/duplicates_screen.dart';
+import '../screens/folder_sizes_screen.dart';
+import '../services/cleanup_service.dart';
 import 'tool.dart';
 import 'tool_actions.dart';
+
+const _mb = 1024 * 1024;
+
+bool _olderThan(FileItem f, int days) =>
+    DateTime.now().difference(f.modified).inDays >= days;
 
 Future<void> Function(BuildContext) _open(Widget Function() screen) {
   return (context) async {
@@ -24,7 +33,7 @@ final List<Tool> allTools = [
     title: 'Convert images',
     subtitle: 'PNG, JPG, WebP and more',
     icon: Icons.transform,
-    category: ToolCategory.convert,
+    category: ToolCategory.images,
     keywords: ['png', 'jpg', 'jpeg', 'webp', 'bmp', 'gif', 'ico', 'tiff', 'format', 'photo', 'picture'],
     run: runConvertImages,
   ),
@@ -33,9 +42,45 @@ final List<Tool> allTools = [
     title: 'Resize and compress',
     subtitle: 'Make photos smaller',
     icon: Icons.photo_size_select_large_outlined,
-    category: ToolCategory.convert,
+    category: ToolCategory.images,
     keywords: ['resize', 'compress', 'shrink', 'smaller', 'size', 'photo', 'reduce'],
     run: runResizeImages,
+  ),
+  Tool(
+    id: 'compress_share',
+    title: 'Compress for sharing',
+    subtitle: 'WhatsApp, email, web',
+    icon: Icons.share_outlined,
+    category: ToolCategory.images,
+    keywords: ['whatsapp', 'email', 'website', 'compress', 'share', 'smaller', 'photo', 'send'],
+    run: runCompressForSharing,
+  ),
+  Tool(
+    id: 'edit_image',
+    title: 'Crop and rotate',
+    subtitle: 'Crop, rotate, flip',
+    icon: Icons.crop_rotate,
+    category: ToolCategory.images,
+    keywords: ['crop', 'rotate', 'flip', 'mirror', 'edit', 'photo', 'picture', 'turn'],
+    run: runEditImage,
+  ),
+  Tool(
+    id: 'photo_info',
+    title: 'Photo info',
+    subtitle: 'EXIF, camera, location',
+    icon: Icons.camera_outlined,
+    category: ToolCategory.images,
+    keywords: ['exif', 'metadata', 'camera', 'gps', 'location', 'date', 'info', 'details'],
+    run: runPhotoInfo,
+  ),
+  Tool(
+    id: 'strip_metadata',
+    title: 'Remove metadata',
+    subtitle: 'Strip location and EXIF',
+    icon: Icons.cleaning_services_outlined,
+    category: ToolCategory.images,
+    keywords: ['exif', 'metadata', 'privacy', 'gps', 'location', 'remove', 'strip', 'clean'],
+    run: runStripMetadata,
   ),
   const Tool(
     id: 'video_to_audio',
@@ -53,6 +98,60 @@ final List<Tool> allTools = [
     category: ToolCategory.documents,
     keywords: ['pdf', 'photo', 'merge', 'combine', 'document'],
     run: runImagesToPdf,
+  ),
+  Tool(
+    id: 'merge_pdf',
+    title: 'Merge PDFs',
+    subtitle: 'Join PDFs into one',
+    icon: Icons.merge_type,
+    category: ToolCategory.documents,
+    keywords: ['pdf', 'merge', 'combine', 'join', 'document'],
+    run: runMergePdfs,
+  ),
+  Tool(
+    id: 'split_pdf',
+    title: 'Split and extract',
+    subtitle: 'Pull out pages',
+    icon: Icons.call_split,
+    category: ToolCategory.documents,
+    keywords: ['pdf', 'split', 'extract', 'pages', 'separate', 'cut'],
+    run: runSplitPdf,
+  ),
+  Tool(
+    id: 'organize_pdf',
+    title: 'Organize pages',
+    subtitle: 'Rotate, reorder, delete',
+    icon: Icons.auto_awesome_motion_outlined,
+    category: ToolCategory.documents,
+    keywords: ['pdf', 'rotate', 'reorder', 'delete', 'remove', 'pages', 'organize', 'sort'],
+    run: runOrganizePdf,
+  ),
+  Tool(
+    id: 'pdf_to_images',
+    title: 'PDF to images',
+    subtitle: 'Save pages as pictures',
+    icon: Icons.photo_library_outlined,
+    category: ToolCategory.documents,
+    keywords: ['pdf', 'image', 'png', 'jpg', 'convert', 'pages', 'picture'],
+    run: runPdfToImages,
+  ),
+  Tool(
+    id: 'pdf_to_text',
+    title: 'PDF to text',
+    subtitle: 'Copy the words out',
+    icon: Icons.text_snippet_outlined,
+    category: ToolCategory.documents,
+    keywords: ['pdf', 'text', 'extract', 'txt', 'copy', 'words'],
+    run: runPdfToText,
+  ),
+  Tool(
+    id: 'text_to_pdf',
+    title: 'Text to PDF',
+    subtitle: 'Text or Markdown',
+    icon: Icons.notes,
+    category: ToolCategory.documents,
+    keywords: ['pdf', 'text', 'markdown', 'md', 'txt', 'document', 'convert', 'write'],
+    run: runTextToPdf,
   ),
   Tool(
     id: 'zip',
@@ -82,6 +181,100 @@ final List<Tool> allTools = [
     run: runChecksum,
   ),
   Tool(
+    id: 'large_files',
+    title: 'Large files',
+    subtitle: 'Find what takes space',
+    icon: Icons.data_usage,
+    category: ToolCategory.cleanup,
+    keywords: ['large', 'big', 'biggest', 'space', 'storage', 'size', 'free', 'clean'],
+    run: _open(
+          () => CleanupScreen(
+        title: 'Large files',
+        intro: 'Tap files to select them, then move them to the trash.',
+        loader: () async => [
+          for (final f in await CleanupService.allFiles())
+            if (f.size >= 10 * _mb) f,
+        ],
+        filters: [
+          CleanupFilter('Over 10 MB', (f) => f.size >= 10 * _mb),
+          CleanupFilter('Over 50 MB', (f) => f.size >= 50 * _mb),
+          CleanupFilter('Over 100 MB', (f) => f.size >= 100 * _mb),
+          CleanupFilter('Over 500 MB', (f) => f.size >= 500 * _mb),
+        ],
+        initialFilter: 1,
+        emptyTitle: 'No files this big',
+        emptyBody: 'Try a smaller size.',
+      ),
+    ),
+  ),
+  Tool(
+    id: 'old_files',
+    title: 'Old files',
+    subtitle: 'Not touched for months',
+    icon: Icons.history,
+    category: ToolCategory.cleanup,
+    keywords: ['old', 'unused', 'forgotten', 'months', 'years', 'clean', 'space'],
+    run: _open(
+          () => CleanupScreen(
+        title: 'Old files',
+        intro: 'Files you have not changed for a while (100 KB and bigger).',
+        loader: () async => [
+          for (final f in await CleanupService.allFiles())
+            if (f.size >= 100 * 1024 && _olderThan(f, 90)) f,
+        ],
+        filters: [
+          CleanupFilter('3+ months', (f) => _olderThan(f, 90)),
+          CleanupFilter('6+ months', (f) => _olderThan(f, 180)),
+          CleanupFilter('1+ year', (f) => _olderThan(f, 365)),
+          CleanupFilter('2+ years', (f) => _olderThan(f, 730)),
+        ],
+        initialFilter: 1,
+        emptyTitle: 'Nothing this old',
+        emptyBody: 'Your files are fairly fresh.',
+      ),
+    ),
+  ),
+  Tool(
+    id: 'downloads_cleaner',
+    title: 'Downloads cleaner',
+    subtitle: 'Tidy your Download folder',
+    icon: Icons.cleaning_services_outlined,
+    category: ToolCategory.cleanup,
+    keywords: ['downloads', 'download', 'apk', 'installer', 'zip', 'clean', 'tidy', 'junk'],
+    run: _open(
+          () => CleanupScreen(
+        title: 'Downloads cleaner',
+        intro: 'Everything in your Download folder. Select what you no longer need.',
+        loader: CleanupService.downloads,
+        initialSort: CleanupSort.newest,
+        filters: [
+          CleanupFilter('All', (f) => true),
+          CleanupFilter('APKs', (f) => f.kind == FileKind.apk),
+          CleanupFilter('ZIPs', (f) => f.kind == FileKind.archive),
+          CleanupFilter(
+            'Documents',
+                (f) => f.kind == FileKind.pdf || f.kind == FileKind.document,
+          ),
+          CleanupFilter('Images', (f) => f.kind == FileKind.image),
+          CleanupFilter('Videos', (f) => f.kind == FileKind.video),
+          CleanupFilter('Audio', (f) => f.kind == FileKind.audio),
+          CleanupFilter('Other', (f) => f.kind == FileKind.other),
+        ],
+        emptyTitle: 'Nothing here',
+        emptyBody: 'Your Download folder is clean.',
+      ),
+    ),
+  ),
+  Tool(
+    id: 'folder_sizes',
+    title: 'Folder sizes',
+    subtitle: 'Which folders are biggest',
+    icon: Icons.account_tree_outlined,
+    category: ToolCategory.cleanup,
+    keywords: ['folder', 'size', 'space', 'storage', 'analyzer', 'biggest', 'usage', 'disk'],
+    run: _open(() => const FolderSizesScreen()),
+  ),
+  Tool(
     id: 'duplicates',
     title: 'Duplicate finder',
     subtitle: 'Free up space',
@@ -91,6 +284,15 @@ final List<Tool> allTools = [
     run: (context) => Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => const DuplicatesScreen()),
     ),
+  ),
+  Tool(
+    id: 'apk_analyzer',
+    title: 'APK analyzer',
+    subtitle: 'Permissions, version, signature',
+    icon: Icons.android,
+    category: ToolCategory.developer,
+    keywords: ['apk', 'android', 'permissions', 'package', 'signature', 'certificate', 'manifest'],
+    run: runApkAnalyzer,
   ),
   Tool(
     id: 'json_tools',

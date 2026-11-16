@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
 
 enum ToolCategory {
-  convert('Convert'),
-  documents('PDF and documents'),
-  organize('Organize'),
-  cleanup('Clean up'),
-  developer('Developer'),
-  privacy('Privacy');
+  convert('Convert', Icons.swap_horiz, 'Change file formats'),
+  images('Images', Icons.image_outlined, 'Edit, shrink and inspect'),
+  documents('PDF and documents', Icons.picture_as_pdf_outlined, 'Merge, split and create'),
+  organize('Organize', Icons.drive_file_rename_outline, 'Rename, zip and sort'),
+  cleanup('Clean up', Icons.cleaning_services_outlined, 'Free up space'),
+  developer('Developer', Icons.code, 'Format, encode and inspect'),
+  privacy('Privacy', Icons.shield_outlined, 'Protect your files');
 
-  const ToolCategory(this.label);
+  const ToolCategory(this.label, this.icon, this.blurb);
   final String label;
+  final IconData icon;
+  final String blurb;
 }
 
 /// One entry in the Tools tab. A tool with no [run] is shown as "Coming soon".

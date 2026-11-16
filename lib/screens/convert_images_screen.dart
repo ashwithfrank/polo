@@ -21,12 +21,16 @@ class ConvertImagesScreen extends StatefulWidget {
     super.key,
     required this.files,
     this.keepFormat = false,
+    this.share = false,
   });
 
   final List<FileItem> files;
 
   /// True for "Resize and compress": each image keeps its own format.
   final bool keepFormat;
+
+  /// True for "Compress for sharing": adds WhatsApp / Email / Website presets.
+  final bool share;
 
   @override
   State<ConvertImagesScreen> createState() => _ConvertImagesScreenState();
@@ -39,12 +43,20 @@ class _ConvertImagesScreenState extends State<ConvertImagesScreen> {
   ImageTarget _target = ImageTarget.jpg;
   double _quality = 85;
   int? _maxSide;
+  String? _preset;
   bool _running = false;
   bool _finished = false;
 
   int get _doneCount => _jobs.where((j) => j.status == _Status.done).length;
 
-  static const _sizes = <int?>[null, 2560, 1920, 1280, 800];
+  static const _sizes = <int?>[null, 2560, 1920, 1600, 1280, 1024, 800];
+
+  static const _presets = <({String label, int side, int quality, String hint})>[
+    (label: 'WhatsApp', side: 1600, quality: 75, hint: 'Good for chats'),
+    (label: 'Email', side: 1280, quality: 70, hint: 'Small attachments'),
+    (label: 'Website', side: 1920, quality: 80, hint: 'Sharp on big screens'),
+    (label: 'Smallest', side: 1024, quality: 50, hint: 'As small as it gets'),
+  ];
 
   bool get _showQuality => widget.keepFormat || _target.usesQuality;
 
@@ -117,7 +129,13 @@ class _ConvertImagesScreenState extends State<ConvertImagesScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.keepFormat ? 'Resize and compress' : 'Convert images'),
+        title: Text(
+          widget.share
+              ? 'Compress for sharing'
+              : widget.keepFormat
+              ? 'Resize and compress'
+              : 'Convert images',
+        ),
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
@@ -143,6 +161,36 @@ class _ConvertImagesScreenState extends State<ConvertImagesScreen> {
               _hint(scheme, 'Icons are limited to 256 pixels, so bigger images are shrunk.'),
           ] else
             _hint(scheme, 'Each image keeps its format. The originals are never changed.'),
+          if (widget.share) ...[
+            const SizedBox(height: 20),
+            Text('Made for', style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: [
+                for (final p in _presets)
+                  ChoiceChip(
+                    label: Text(p.label),
+                    selected: _preset == p.label,
+                    onSelected: _running
+                        ? null
+                        : (_) => _optionChanged(() {
+                      _preset = p.label;
+                      _maxSide = p.side;
+                      _quality = p.quality.toDouble();
+                    }),
+                  ),
+              ],
+            ),
+            _hint(
+              scheme,
+              _preset == null
+                  ? 'Pick one, or set the size and quality yourself below.'
+                  : '${_presets.firstWhere((p) => p.label == _preset).hint}. '
+                  'Photos are shrunk on your phone. Nothing is uploaded.',
+            ),
+          ],
           const SizedBox(height: 20),
           Text('Longest side', style: Theme.of(context).textTheme.titleSmall),
           const SizedBox(height: 8),
@@ -154,7 +202,12 @@ class _ConvertImagesScreenState extends State<ConvertImagesScreen> {
                 ChoiceChip(
                   label: Text(size == null ? 'Original' : '$size px'),
                   selected: _maxSide == size,
-                  onSelected: _running ? null : (_) => _optionChanged(() => _maxSide = size),
+                  onSelected: _running
+                      ? null
+                      : (_) => _optionChanged(() {
+                    _maxSide = size;
+                    _preset = null;
+                  }),
                 ),
             ],
           ),
@@ -173,7 +226,12 @@ class _ConvertImagesScreenState extends State<ConvertImagesScreen> {
               min: 30,
               max: 100,
               divisions: 14,
-              onChanged: _running ? null : (v) => _optionChanged(() => _quality = v),
+              onChanged: _running
+                  ? null
+                  : (v) => _optionChanged(() {
+                _quality = v;
+                _preset = null;
+              }),
             ),
             _hint(
               scheme,

@@ -2,7 +2,7 @@
 
 A fast, clean file manager for Android with built-in tools, made with Flutter. Polo uses a warm orange and cream design with a light and dark theme.
 
-> Status: early development (v0.4.0). Home, Browse, Search, Tools, Trash and Storage all work. More tools are on the way.
+> Status: v1.0.0. File manager, vault, image and PDF tools, clean up, APK analyzer and developer tools. All offline.
 
 ## Features
 
@@ -31,12 +31,18 @@ A fast, clean file manager for Android with built-in tools, made with Flutter. P
 - Search every file and folder by name, with filter chips
 - Tap a category on Home or Storage to see all images, videos, audio, documents, archives or apps in one list
 
-**Tools**
-- Image converter: PNG and JPG, with adjustable JPG quality
-- Images to PDF: reorder pages, A4 or fit-to-image, quality slider
-- Zip and unzip: compress files and folders, extract `.zip` files into their own folder
-- Duplicate finder: finds identical files by content and moves the extra copies to trash
+**Tools** (grouped into category cards, searchable)
+- Convert and images: format converter, compress, edit (crop, rotate, resize), photo info (EXIF), remove metadata
+- PDF: merge, split, organize pages, PDF to images, PDF to text, text and Markdown to PDF, images to PDF
+- Organize: zip and unzip, batch rename, duplicate finder, checksums
+- Clean up: large files, old files, downloads cleaner, folder sizes
+- Developer: JSON formatter, encode/decode, JWT decoder, text hash, regex tester, color tools, converters, APK analyzer
+- Privacy: password generator
 - Originals are never touched: results are saved next to them
+
+**Vault**
+- Lock private files with a password (PBKDF2 + AES-256-GCM, encrypted on the device)
+- Locks itself when you leave the app. A forgotten password cannot be recovered
 
 **Trash and details**
 - Deleted files go to a trash you can restore from (Settings, then Trash), with Undo in Browse
@@ -53,8 +59,7 @@ A fast, clean file manager for Android with built-in tools, made with Flutter. P
 - Custom app icon (themed icon on Android 13+) and a splash screen for both themes
 
 **Planned**
-- Video to audio
-- WebP output for the image converter
+- Camera tools: QR scanner and generator, OCR, document scanner
 
 ## App details
 
