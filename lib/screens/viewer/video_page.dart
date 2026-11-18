@@ -6,7 +6,10 @@ import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../models/file_item.dart';
+import '../../services/mp4_repair.dart';
 import '../../widgets/open_external.dart';
+import '../../widgets/polo_message.dart';
+import '../../widgets/progress_dialog.dart';
 import 'player_bits.dart';
 
 class VideoPage extends StatefulWidget {
@@ -23,7 +26,7 @@ class VideoPage extends StatefulWidget {
 }
 
 class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
-  late final VideoPlayerController _controller;
+  late VideoPlayerController _controller;
   bool _ready = false;
   bool _failed = false;
   bool _showControls = true;
@@ -35,18 +38,33 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
   Alignment _seekHintAt = Alignment.center;
   Timer? _hintTimer;
   Offset _lastTap = Offset.zero;
+  bool _warnedSeek = false;
+  bool _repaired = false;
+
+  static final _cacheDir = Directory('${Directory.systemTemp.path}/polo_video');
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _controller = VideoPlayerController.file(File(widget.item.path));
-    _controller.addListener(_onPlayerChanged);
-    _controller.initialize().then((_) {
+    _open(widget.item.path);
+  }
+
+  /// Starts playing [path]. After a repair it carries on from [resumeAt].
+  void _open(String path, {Duration? resumeAt}) {
+    final controller = VideoPlayerController.file(File(path));
+    _controller = controller;
+    controller.addListener(_onPlayerChanged);
+    controller.initialize().then((_) async {
+      if (!mounted) return;
+      if (resumeAt != null) await controller.seekTo(resumeAt);
       if (!mounted) return;
       setState(() => _ready = true);
-      _controller.play();
+      controller.play();
       _scheduleHide();
+      // A fragmented MP4 can't be skipped around even when it shows a length,
+      // so check the file itself and fix it before anyone tries to seek.
+      if (resumeAt == null) _checkOnOpen();
     }).catchError((_) {
       if (mounted) setState(() => _failed = true);
     });
@@ -71,6 +89,9 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
     _hintTimer?.cancel();
     _controller.removeListener(_onPlayerChanged);
     _controller.dispose();
+    try {
+      if (_cacheDir.existsSync()) _cacheDir.deleteSync(recursive: true);
+    } catch (_) {}
     SystemChrome.setPreferredOrientations(DeviceOrientation.values);
     super.dispose();
   }
@@ -103,13 +124,97 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
     }
   }
 
-  void _seekBy(int seconds) {
+  Future<void> _seekBy(int seconds) async {
     final v = _controller.value;
+    // Without a known length the player can't jump at all (it would go back
+    // to the start), so offer the fix instead.
+    if (!hasKnownLength(v)) {
+      _warnedSeek = false; // show the offer again if it was dismissed
+      _seekFailed();
+      return;
+    }
     var target = v.position + Duration(seconds: seconds);
     if (target < Duration.zero) target = Duration.zero;
     if (target > v.duration) target = v.duration;
-    _controller.seekTo(target);
     if (_showControls) _scheduleHide();
+    if (!await seekChecked(_controller, target)) _seekFailed();
+  }
+
+  /// Runs once when a video opens. A fragmented MP4 is fixed right away, so
+  /// skipping works from the first second. Anything else is left alone.
+  Future<void> _checkOnOpen() async {
+    var fixable = false;
+    try {
+      fixable = await Mp4Repair.needsRepair(widget.item.path);
+    } catch (_) {}
+    if (!mounted || _repaired) return;
+    if (fixable) {
+      _warnedSeek = true;
+      await _repair();
+    } else if (!hasKnownLength(_controller.value)) {
+      _seekFailed();
+    }
+  }
+
+  /// The player can't jump around in this video. If the file is a fragmented
+  /// MP4, Polo fixes it by itself. Otherwise it suggests another app.
+  Future<void> _seekFailed() async {
+    if (!mounted || _warnedSeek || _repaired) return;
+    _warnedSeek = true;
+
+    var fixable = false;
+    try {
+      fixable = await Mp4Repair.needsRepair(widget.item.path);
+    } catch (_) {}
+    if (!mounted) return;
+
+    if (fixable) {
+      // Fix it automatically, no need to ask.
+      await _repair();
+    } else {
+      showPoloMessage(
+        context,
+        "Skipping around doesn't work in Polo for this video",
+        actionLabel: 'Open in another app',
+        onAction: () => openExternally(context, widget.item),
+      );
+    }
+  }
+
+  /// Makes a seekable copy in the cache (the original is never changed) and
+  /// carries on playing from the same place.
+  Future<void> _repair() async {
+    final position = _controller.value.position;
+    _controller.pause();
+    await _cacheDir.create(recursive: true);
+    if (!mounted) return;
+    final out = '${_cacheDir.path}/video.mp4';
+
+    final String? error;
+    try {
+      error = await runWithProgress(
+        context,
+        'Making the video seekable…',
+            () => Mp4Repair.makeSeekable(widget.item.path, out),
+      );
+    } catch (_) {
+      if (mounted) showPoloMessage(context, "Couldn't fix this video");
+      return;
+    }
+    if (!mounted) return;
+    if (error != null) {
+      showPoloMessage(context, error);
+      return;
+    }
+
+    _repaired = true;
+    setState(() => _ready = false);
+    final old = _controller;
+    await WidgetsBinding.instance.endOfFrame;
+    old.removeListener(_onPlayerChanged);
+    await old.dispose();
+    if (!mounted) return;
+    _open(out, resumeAt: position);
   }
 
   void _doubleTap(double width) {
@@ -259,7 +364,7 @@ class _VideoPageState extends State<VideoPage> with WidgetsBindingObserver {
               padding: const EdgeInsets.fromLTRB(12, 0, 4, 4),
               child: Row(
                 children: [
-                  Expanded(child: SeekBar(controller: _controller, color: Colors.white)),
+                  Expanded(child: SeekBar(controller: _controller, color: Colors.white, onSeekFailed: _seekFailed)),
                   SpeedMenu(controller: _controller, color: Colors.white),
                   ValueListenableBuilder<VideoPlayerValue>(
                     valueListenable: _controller,

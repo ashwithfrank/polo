@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../models/file_item.dart';
 import '../models/storage_category.dart';
 import '../services/settings_controller.dart';
 import '../services/storage_controller.dart';
@@ -16,6 +17,13 @@ import 'storage_screen.dart';
 import 'tools_screen.dart';
 import 'vault_screen.dart';
 import '../widgets/polo_message.dart';
+import '../widgets/open_file.dart';
+import '../widgets/progress_dialog.dart';
+import '../services/incoming_service.dart';
+import 'apk_analyzer_screen.dart';
+import 'pick_files_screen.dart';
+import 'received_files_screen.dart';
+import 'viewer/viewer_screen.dart' show canView;
 
 class HomeShell extends StatefulWidget {
   const HomeShell({
@@ -47,11 +55,19 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     _storage.load();
     // Clear out trash older than 30 days. Best effort.
     TrashService().purgeOld().catchError((_) {});
+
+    // Files other apps open or share with Polo.
+    IncomingService.listen(_handleIncoming);
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final first = await IncomingService.initial();
+      if (first != null) _handleIncoming(first);
+    });
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    IncomingService.stopListening();
     _storage.dispose();
     _jump.dispose();
     _browseHandlesBack.dispose();
@@ -101,6 +117,66 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     }
     _lastBack = now;
     showPoloMessage(context, 'Press back again to exit');
+  }
+
+  /// Another app (such as a browser's upload button) asked the user to pick
+  /// files. Show Polo's file picker and hand back the choice.
+  Future<void> _handlePick(IncomingIntent incoming) async {
+    final picked = await Navigator.of(context).push<List<FileItem>>(
+      MaterialPageRoute(
+        builder: (_) => PickFilesScreen(
+          title: incoming.multiple ? 'Choose files' : 'Choose a file',
+          accepts: (item) => IncomingService.matchesMime(item, incoming.mimeTypes),
+          single: !incoming.multiple,
+        ),
+      ),
+    );
+    if (picked == null || picked.isEmpty) {
+      await IncomingService.cancelPick();
+      return;
+    }
+    try {
+      await IncomingService.finishPick([for (final f in picked) f.path]);
+    } catch (_) {
+      await IncomingService.cancelPick();
+    }
+  }
+
+  Future<void> _handleIncoming(IncomingIntent incoming) async {
+    if (!mounted) return;
+    if (incoming.isPick) {
+      await _handlePick(incoming);
+      return;
+    }
+    final List<FileItem> items;
+    try {
+      items = await runWithProgress(
+        context,
+        'Opening…',
+            () => IncomingService.resolveAll(incoming.files),
+      );
+    } catch (e) {
+      if (mounted) {
+        showPoloMessage(context, e is FormatException ? e.message : "Couldn't open this file");
+      }
+      return;
+    }
+    if (!mounted || items.isEmpty) return;
+
+    final navigator = Navigator.of(context);
+    navigator.popUntil((route) => route.isFirst);
+    final first = items.first;
+    if (incoming.isView && items.length == 1) {
+      if (first.extension == 'apk') {
+        navigator.push(MaterialPageRoute(builder: (_) => ApkAnalyzerScreen(item: first)));
+        return;
+      }
+      if (canView(first)) {
+        await openFile(context, first);
+        return;
+      }
+    }
+    navigator.push(MaterialPageRoute(builder: (_) => ReceivedFilesScreen(items: items)));
   }
 
   void _openSearch() {

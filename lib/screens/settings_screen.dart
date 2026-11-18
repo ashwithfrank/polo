@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../services/file_service.dart';
 import '../services/settings_controller.dart';
 import '../theme/theme_controller.dart';
+import '../widgets/accent_picker.dart';
 import 'about_screen.dart';
 import 'trash_screen.dart';
 
@@ -51,6 +52,17 @@ class SettingsScreen extends StatelessWidget {
                   onSelectionChanged: (s) => themeController.setMode(s.first),
                 ),
               ),
+              SwitchListTile(
+                title: const Text('True black'),
+                subtitle: const Text('A pure black dark theme. Saves battery on OLED screens'),
+                value: themeController.oled,
+                onChanged: themeController.setOled,
+              ),
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 8, 16, 12),
+                child: Text('Accent colour'),
+              ),
+              AccentPicker(controller: themeController),
               const _Section('Browsing'),
               SwitchListTile(
                 title: const Text('Show hidden files'),

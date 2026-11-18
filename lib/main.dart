@@ -31,8 +31,8 @@ class PoloApp extends StatelessWidget {
         return MaterialApp(
           title: 'Polo',
           debugShowCheckedModeBanner: false,
-          theme: AppTheme.light,
-          darkTheme: AppTheme.dark,
+          theme: AppTheme.light(themeController.accent),
+          darkTheme: AppTheme.dark(themeController.accent, themeController.oled),
           themeMode: themeController.mode,
           home: HomeShell(themeController: themeController, settings: settings),
         );

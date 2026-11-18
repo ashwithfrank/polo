@@ -12,16 +12,40 @@ String formatDuration(Duration d) {
 bool hasFinished(VideoPlayerValue v) =>
     v.isInitialized &&
         !v.isPlaying &&
-        v.duration > Duration.zero &&
+        v.duration >= const Duration(seconds: 1) &&
         v.position >= v.duration - const Duration(milliseconds: 250);
+
+/// Whether the player knows how long the video is. Some files report no length
+/// at all and the player then says "1 millisecond" instead of 0, so anything
+/// under a second counts as unknown.
+bool hasKnownLength(VideoPlayerValue v) => v.duration >= const Duration(seconds: 1);
+
+/// Jumps to [target], then checks that the player really got there. Some
+/// files (for example MKV videos with no seek index) can't be skipped around
+/// in by the player, and it silently restarts from the beginning instead.
+/// Returns false when that happened.
+Future<bool> seekChecked(VideoPlayerController controller, Duration target) async {
+  await controller.seekTo(target);
+  // Too close to the start to tell a failed jump from a real one.
+  if (target < const Duration(seconds: 5)) {
+    return true;
+  }
+  await Future<void>.delayed(const Duration(milliseconds: 900));
+  final position = controller.value.position;
+  final ok = position >= target - const Duration(seconds: 3);
+  return ok;
+}
 
 /// Seek bar with elapsed and total time. While you drag, the thumb follows
 /// your finger; the video only jumps when you let go.
 class SeekBar extends StatefulWidget {
-  const SeekBar({super.key, required this.controller, this.color});
+  const SeekBar({super.key, required this.controller, this.color, this.onSeekFailed});
 
   final VideoPlayerController controller;
   final Color? color;
+
+  /// Called when a jump didn't work (see [seekChecked]).
+  final VoidCallback? onSeekFailed;
 
   @override
   State<SeekBar> createState() => _SeekBarState();
@@ -37,9 +61,13 @@ class _SeekBarState extends State<SeekBar> {
       valueListenable: widget.controller,
       builder: (context, value, _) {
         final total = value.duration.inMilliseconds;
-        final max = (total > 0 ? total : 1).toDouble();
-        final pos = (_drag ?? value.position.inMilliseconds.toDouble()).clamp(0.0, max);
-        final shown = Duration(milliseconds: pos.round());
+        // Some files don't say how long they are. The time still counts up,
+        // but the bar can't move and the length shows as "--:--".
+        final known = hasKnownLength(value);
+        final max = (known ? total : 1).toDouble();
+        final raw = _drag ?? value.position.inMilliseconds.toDouble();
+        final pos = known ? raw.clamp(0.0, max) : 0.0;
+        final shown = Duration(milliseconds: raw.round());
         return Row(
           children: [
             Text(formatDuration(shown), style: TextStyle(color: fg, fontSize: 12)),
@@ -47,14 +75,16 @@ class _SeekBarState extends State<SeekBar> {
               child: Slider(
                 value: pos,
                 max: max,
-                onChanged: total > 0 ? (v) => setState(() => _drag = v) : null,
+                onChanged: known ? (v) => setState(() => _drag = v) : null,
                 onChangeEnd: (v) {
-                  widget.controller.seekTo(Duration(milliseconds: v.round()));
+                  seekChecked(widget.controller, Duration(milliseconds: v.round())).then((ok) {
+                    if (!ok) widget.onSeekFailed?.call();
+                  });
                   setState(() => _drag = null);
                 },
               ),
             ),
-            Text(formatDuration(value.duration), style: TextStyle(color: fg, fontSize: 12)),
+            Text(known ? formatDuration(value.duration) : '--:--', style: TextStyle(color: fg, fontSize: 12)),
           ],
         );
       },

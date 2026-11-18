@@ -6,6 +6,7 @@ import '../../models/file_item.dart';
 import '../../widgets/delete_file.dart';
 import '../../widgets/file_details.dart';
 import '../../widgets/open_external.dart';
+import '../text_editor_screen.dart';
 import 'audio_page.dart';
 import 'image_page.dart';
 import 'pdf_page.dart';
@@ -55,6 +56,9 @@ class _ViewerScreenState extends State<ViewerScreen> {
   late int _index = widget.initialIndex < 0 ? 0 : widget.initialIndex;
   bool _zoomed = false;
 
+  /// Changes after the text editor saves, so the text view reloads.
+  int _textVersion = 0;
+
   /// Whether the top bar and the system bars are showing. Images and videos
   /// hide them so the picture fills the whole screen.
   bool _chrome = true;
@@ -62,7 +66,8 @@ class _ViewerScreenState extends State<ViewerScreen> {
   FileItem get _current => _items[_index];
   bool get _dark => _current.kind == FileKind.image || _current.kind == FileKind.video;
 
-  bool get _immersive => _dark;
+  // Pictures, videos and PDFs fill the screen; their bars hide while you read.
+  bool get _immersive => _dark || _current.kind == FileKind.pdf;
 
   @override
   void initState() {
@@ -130,8 +135,8 @@ class _ViewerScreenState extends State<ViewerScreen> {
       return VideoPage(key: ValueKey(item.path), item: item, onControlsChanged: _setChrome);
     }
     if (item.kind == FileKind.audio) return AudioPage(key: ValueKey(item.path), item: item);
-    if (item.kind == FileKind.pdf) return PdfPage(key: ValueKey(item.path), item: item);
-    return TextPage(key: ValueKey(item.path), item: item);
+    if (item.kind == FileKind.pdf) return PdfPage(key: ValueKey(item.path), item: item, onControlsChanged: _setChrome);
+    return TextPage(key: ValueKey('${item.path}#$_textVersion'), item: item);
   }
 
   @override
@@ -164,6 +169,17 @@ class _ViewerScreenState extends State<ViewerScreen> {
       scrolledUnderElevation: 0,
       title: Text(title, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16)),
       actions: [
+        if (_isText(item))
+          IconButton(
+            tooltip: 'Edit',
+            icon: const Icon(Icons.edit_outlined),
+            onPressed: () async {
+              await Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => TextEditorScreen(item: item)),
+              );
+              if (mounted) setState(() => _textVersion++);
+            },
+          ),
         IconButton(
           tooltip: 'Share',
           icon: const Icon(Icons.share_outlined),
