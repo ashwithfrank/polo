@@ -1,6 +1,6 @@
 # Polo Privacy Policy
  
-Last updated: 14 November 2026
+Last updated: 20 November 2026
  
 Polo is a file manager app for Android made by AlphaOmega Studio ("we", "us").
  
@@ -14,6 +14,9 @@ None. Polo does not collect personal information, usage data, analytics or crash
  
 ## Network access
 Polo does not request internet permission and does not connect to any server.
+
+## Camera and scanning
+Polo can use your camera to scan documents, read text from a photo, and scan QR codes and barcodes. The camera is used only while you are using one of these tools, and the permission is requested when you first open one. Pictures, scans, scanned text and QR codes stay on your device and are never sent to AlphaOmega Studio or anyone else. Text recognition and QR scanning run on your phone. Document scanning uses Google's ML Kit Document Scanner, which is part of Google Play services on your phone. Google may download that component to your phone the first time you use it. Polo itself has no internet access and does not send your scans anywhere.
  
 ## Data stored on your device
 Polo saves a few settings on your device, such as your theme, sort order and list or grid choice. Deleted files are moved to a hidden "Polo trash" folder on your device and are removed after 30 days, or earlier if you empty the trash. This data stays on your device and is removed when you uninstall Polo, except for any files you chose to keep.

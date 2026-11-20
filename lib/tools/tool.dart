@@ -4,6 +4,7 @@ enum ToolCategory {
   convert('Convert', Icons.swap_horiz, 'Change file formats'),
   images('Images', Icons.image_outlined, 'Edit, shrink and inspect'),
   documents('PDF and documents', Icons.picture_as_pdf_outlined, 'Merge, split and create'),
+  scan('Scan and create', Icons.qr_code_scanner, 'QR codes and more'),
   organize('Organize', Icons.drive_file_rename_outline, 'Rename, zip and sort'),
   cleanup('Clean up', Icons.cleaning_services_outlined, 'Free up space'),
   developer('Developer', Icons.code, 'Format, encode and inspect'),

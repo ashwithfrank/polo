@@ -9,6 +9,10 @@ import '../models/file_item.dart';
 import '../screens/cleanup_screen.dart';
 import '../screens/duplicates_screen.dart';
 import '../screens/folder_sizes_screen.dart';
+import '../screens/doc_scan_screen.dart';
+import '../screens/ocr_screen.dart';
+import '../screens/qr_generator_screen.dart';
+import '../screens/qr_scanner_screen.dart';
 import '../services/cleanup_service.dart';
 import 'tool.dart';
 import 'tool_actions.dart';
@@ -179,6 +183,42 @@ final List<Tool> allTools = [
     category: ToolCategory.organize,
     keywords: ['hash', 'md5', 'sha', 'sha256', 'verify', 'integrity', 'download'],
     run: runChecksum,
+  ),
+  Tool(
+    id: 'qr_scanner',
+    title: 'Scan QR code',
+    subtitle: 'QR codes and barcodes',
+    icon: Icons.qr_code_scanner,
+    category: ToolCategory.scan,
+    keywords: ['qr', 'barcode', 'scan', 'camera', 'code', 'wifi', 'link'],
+    run: _open(() => const QrScannerScreen()),
+  ),
+  Tool(
+    id: 'doc_scanner',
+    title: 'Scan a document',
+    subtitle: 'Camera to PDF, cleaned up',
+    icon: Icons.document_scanner,
+    category: ToolCategory.scan,
+    keywords: ['scan', 'document', 'scanner', 'pdf', 'paper', 'camera', 'page', 'receipt', 'notes'],
+    run: startDocScan,
+  ),
+  Tool(
+    id: 'ocr',
+    title: 'Text from picture',
+    subtitle: 'Read text with the camera',
+    icon: Icons.document_scanner_outlined,
+    category: ToolCategory.scan,
+    keywords: ['ocr', 'text', 'read', 'scan', 'camera', 'photo', 'extract', 'picture', 'copy'],
+    run: startOcr,
+  ),
+  Tool(
+    id: 'qr_generator',
+    title: 'Make a QR code',
+    subtitle: 'Text, links, Wi-Fi, contacts',
+    icon: Icons.qr_code_2,
+    category: ToolCategory.scan,
+    keywords: ['qr', 'code', 'generate', 'create', 'wifi', 'link', 'contact', 'vcard'],
+    run: _open(() => const QrGeneratorScreen()),
   ),
   Tool(
     id: 'compare_files',

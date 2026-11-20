@@ -14,6 +14,7 @@ import '../screens/images_to_pdf_screen.dart';
 import '../screens/pdf_organize_screen.dart';
 import '../screens/pdf_split_screen.dart';
 import '../screens/pdf_to_images_screen.dart';
+import '../screens/ocr_screen.dart';
 import '../screens/photo_info_screen.dart';
 import '../screens/pick_files_screen.dart';
 import '../screens/strip_metadata_screen.dart';
@@ -206,6 +207,8 @@ List<_Action> _typeActions(FileItem item) {
               (c) => _push(c, ConvertImagesScreen(files: [item], keepFormat: true, share: true))),
       _Action(Icons.picture_as_pdf_outlined, 'Make a PDF',
               (c) => _push(c, ImagesToPdfScreen(files: [item]))),
+      _Action(Icons.text_fields, 'Text from picture',
+              (c) => _push(c, OcrScreen(path: item.path, saveDir: item.parentPath))),
       _Action(Icons.camera_alt_outlined, 'Photo info',
               (c) => _push(c, PhotoInfoScreen(item: item))),
     ]);
