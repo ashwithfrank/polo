@@ -5,6 +5,7 @@ import '../services/file_service.dart';
 import '../services/pdf_service.dart';
 import '../widgets/file_thumb.dart';
 import '../widgets/open_file.dart';
+import '../services/output_location.dart';
 
 class ImagesToPdfScreen extends StatefulWidget {
   const ImagesToPdfScreen({super.key, required this.files});
@@ -125,23 +126,23 @@ class _ImagesToPdfScreenState extends State<ImagesToPdfScreen> {
             trailing: locked
                 ? null
                 : Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (_files.length > 1)
-                  IconButton(
-                    tooltip: 'Remove',
-                    icon: const Icon(Icons.close),
-                    onPressed: () => setState(() => _files.removeAt(i)),
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_files.length > 1)
+                        IconButton(
+                          tooltip: 'Remove',
+                          icon: const Icon(Icons.close),
+                          onPressed: () => setState(() => _files.removeAt(i)),
+                        ),
+                      ReorderableDragStartListener(
+                        index: i,
+                        child: const Padding(
+                          padding: EdgeInsets.all(8),
+                          child: Icon(Icons.drag_handle),
+                        ),
+                      ),
+                    ],
                   ),
-                ReorderableDragStartListener(
-                  index: i,
-                  child: const Padding(
-                    padding: EdgeInsets.all(8),
-                    child: Icon(Icons.drag_handle),
-                  ),
-                ),
-              ],
-            ),
           );
         },
       ),
@@ -150,38 +151,38 @@ class _ImagesToPdfScreenState extends State<ImagesToPdfScreen> {
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
           child: saved == null
               ? FilledButton(
-            style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
-            onPressed: _busy ? null : _create,
-            child: Text(_busy ? 'Creating PDF…' : 'Create PDF'),
-          )
-              : Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Done'),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: FilledButton(
                   style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
-                  onPressed: () => openFile(
-                    context,
-                    FileItem(
-                      path: saved,
-                      name: saved.split('/').last,
-                      isDirectory: false,
-                      size: 0,
-                      modified: DateTime.now(),
+                  onPressed: _busy ? null : _create,
+                  child: Text(_busy ? 'Creating PDF…' : 'Create PDF'),
+                )
+              : Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Done'),
+                      ),
                     ),
-                  ),
-                  child: const Text('Open PDF'),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: FilledButton(
+                        style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+                        onPressed: () => openFile(
+                          context,
+                          FileItem(
+                            path: saved,
+                            name: saved.split('/').last,
+                            isDirectory: false,
+                            size: 0,
+                            modified: DateTime.now(),
+                          ),
+                        ),
+                        child: const Text('Open PDF'),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
-          ),
         ),
       ),
     );
@@ -292,7 +293,7 @@ class _ImagesToPdfScreenState extends State<ImagesToPdfScreen> {
           decoration: InputDecoration(
             labelText: 'File name',
             suffixText: '.pdf',
-            helperText: 'Saved next to the first image',
+            helperText: OutputLocation.hint('the first image', OutputKind.documents),
             errorText: _nameError,
           ),
           onChanged: (_) {

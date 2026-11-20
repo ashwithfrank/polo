@@ -5,7 +5,9 @@ import 'package:permission_handler/permission_handler.dart';
 
 import '../models/file_item.dart';
 import '../services/file_service.dart';
+import '../services/settings_controller.dart';
 import '../widgets/file_tile.dart';
+import '../widgets/drag_select.dart';
 
 /// A small in-app file picker. Shows folders and the files [accepts] allows,
 /// and pops with the list of chosen [FileItem]s.
@@ -38,6 +40,7 @@ class _PickFilesScreenState extends State<PickFilesScreen> with WidgetsBindingOb
   String _path = FileService.rootPath;
   List<FileItem> _items = const [];
   final Map<String, FileItem> _picked = {};
+  final _scroll = ScrollController();
   bool _loading = true;
   String? _error;
 
@@ -53,6 +56,7 @@ class _PickFilesScreenState extends State<PickFilesScreen> with WidgetsBindingOb
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _scroll.dispose();
     super.dispose();
   }
 
@@ -80,7 +84,7 @@ class _PickFilesScreenState extends State<PickFilesScreen> with WidgetsBindingOb
   Future<void> _load(String path) async {
     setState(() => _loading = true);
     try {
-      final all = await _service.list(path, sortBy: SortBy.name, showHidden: false);
+      final all = await _service.list(path, sortBy: SortBy.name, showHidden: SettingsController.current?.showHidden ?? false);
       if (!mounted) return;
       setState(() {
         _path = path;
@@ -148,18 +152,18 @@ class _PickFilesScreenState extends State<PickFilesScreen> with WidgetsBindingOb
         bottomNavigationBar: count == 0
             ? null
             : SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-            child: FilledButton(
-              style: FilledButton.styleFrom(
-                minimumSize: const Size.fromHeight(48),
-                backgroundColor: scheme.primary,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size.fromHeight(48),
+                      backgroundColor: scheme.primary,
+                    ),
+                    onPressed: () => Navigator.pop(context, _picked.values.toList()),
+                    child: Text('Continue with $count ${count == 1 ? 'file' : 'files'}'),
+                  ),
+                ),
               ),
-              onPressed: () => Navigator.pop(context, _picked.values.toList()),
-              child: Text('Continue with $count ${count == 1 ? 'file' : 'files'}'),
-            ),
-          ),
-        ),
       ),
     );
   }
@@ -204,28 +208,40 @@ class _PickFilesScreenState extends State<PickFilesScreen> with WidgetsBindingOb
         Expanded(
           child: _items.isEmpty
               ? const _CenteredMessage(
-            icon: Icons.folder_open_outlined,
-            title: 'Nothing to choose here',
-            body: 'Open another folder to find files.',
-          )
-              : ListView.builder(
-            itemCount: _items.length,
-            itemBuilder: (context, i) {
-              final item = _items[i];
-              return FileTile(
-                item: item,
-                selected: _picked.containsKey(item.path),
-                onTap: () => item.isDirectory
-                    ? _load(item.path)
-                    : widget.single
-                    ? Navigator.pop(context, [item])
-                    : _toggle(item),
-                onLongPress: item.isDirectory && !widget.selectFolders
-                    ? null
-                    : () => _toggle(item),
-              );
-            },
-          ),
+                  icon: Icons.folder_open_outlined,
+                  title: 'Nothing to choose here',
+                  body: 'Open another folder to find files.',
+                )
+              : DragSelectArea(
+                  order: [for (final i in _items) i.path],
+                  selected: _picked.keys.toSet(),
+                  scroll: _scroll,
+                  onChanged: (next) => setState(() {
+                    if (widget.single) return;
+                    _picked.removeWhere((k, _) => !next.contains(k));
+                    for (final i in _items) {
+                      if (next.contains(i.path) && (!i.isDirectory || widget.selectFolders)) {
+                        _picked[i.path] = i;
+                      }
+                    }
+                  }),
+                  child: ListView.builder(
+                  controller: _scroll,
+                  itemCount: _items.length,
+                  itemBuilder: (context, i) {
+                    final item = _items[i];
+                    return DragSelectItem(path: item.path, child: FileTile(
+                      item: item,
+                      selected: _picked.containsKey(item.path),
+                      onTap: () => item.isDirectory
+                          ? _load(item.path)
+                          : widget.single
+                              ? Navigator.pop(context, [item])
+                              : _toggle(item),
+                    ));
+                  },
+                ),
+                ),
         ),
       ],
     );

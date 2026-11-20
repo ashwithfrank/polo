@@ -7,6 +7,7 @@ import 'package:share_plus/share_plus.dart';
 import '../services/file_service.dart';
 import '../services/qr_service.dart';
 import '../widgets/polo_message.dart';
+import '../services/output_location.dart';
 
 enum _Type { text, wifi, contact, email, phone }
 
@@ -62,12 +63,12 @@ class _QrGeneratorScreenState extends State<QrGeneratorScreen> {
         return t(_name).isEmpty
             ? null
             : QrService.contact(
-          name: t(_name),
-          phone: t(_phone),
-          email: t(_email),
-          company: t(_company),
-          website: t(_website),
-        );
+                name: t(_name),
+                phone: t(_phone),
+                email: t(_email),
+                company: t(_company),
+                website: t(_website),
+              );
       case _Type.email:
         return t(_email).isEmpty
             ? null
@@ -95,10 +96,15 @@ class _QrGeneratorScreenState extends State<QrGeneratorScreen> {
   }
 
   Future<String> _save() async {
-    final dir = '${FileService.rootPath}/Pictures/QR codes';
+    final dir = await OutputLocation.resolve(
+      '${FileService.rootPath}/Pictures/QR codes',
+      OutputKind.qr,
+      fromScratch: true,
+    );
     await Directory(dir).create(recursive: true);
     final path = await FileService().uniquePath(dir, 'QR code.png');
     await File(path).writeAsBytes(_png!, flush: true);
+    OutputLocation.announce(path);
     return path;
   }
 
@@ -125,12 +131,12 @@ class _QrGeneratorScreenState extends State<QrGeneratorScreen> {
   }
 
   Widget _field(
-      TextEditingController c,
-      String label, {
-        TextInputType? type,
-        int lines = 1,
-        bool secret = false,
-      }) {
+    TextEditingController c,
+    String label, {
+    TextInputType? type,
+    int lines = 1,
+    bool secret = false,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: TextField(
@@ -236,14 +242,14 @@ class _QrGeneratorScreenState extends State<QrGeneratorScreen> {
               padding: const EdgeInsets.all(8),
               child: png == null
                   ? Center(
-                child: Text(
-                  _problem ?? 'Fill in the details and your code appears here',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: _problem == null ? Colors.black54 : scheme.error,
-                  ),
-                ),
-              )
+                      child: Text(
+                        _problem ?? 'Fill in the details and your code appears here',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: _problem == null ? Colors.black54 : scheme.error,
+                        ),
+                      ),
+                    )
                   : Image.memory(png, filterQuality: FilterQuality.none, fit: BoxFit.contain),
             ),
           ),

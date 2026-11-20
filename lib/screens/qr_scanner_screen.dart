@@ -7,6 +7,7 @@ import '../models/file_item.dart';
 import '../services/qr_parse.dart';
 import '../widgets/polo_message.dart';
 import 'pick_files_screen.dart';
+import '../widgets/haptics.dart';
 
 /// Scans QR codes and barcodes with the camera, or from a picture. Nothing
 /// leaves the phone.
@@ -31,7 +32,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
   Future<void> _found(String raw) async {
     if (_showing || !mounted) return;
     _showing = true;
-    HapticFeedback.mediumImpact();
+    Haptics.strong();
     try {
       await _controller.stop();
     } catch (_) {}

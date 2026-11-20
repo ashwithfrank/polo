@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -166,48 +165,48 @@ class _ConvertImagesScreenState extends State<ConvertImagesScreen> {
       final label = change == 0
           ? 'same size'
           : change < 0
-          ? '${-change}% smaller'
-          : '$change% bigger';
+              ? '${-change}% smaller'
+              : '$change% bigger';
       resultDetail = '${formatBytes(bytes.length)} · $label\n${dims(_previewSize)}';
       color = change <= 0 ? Colors.green : scheme.error;
     }
 
     final Widget result = bytes == null
         ? Center(
-      child: _previewing
-          ? const CircularProgressIndicator(strokeWidth: 3)
-          : Icon(Icons.image_not_supported_outlined, color: scheme.onSurface.withValues(alpha: 0.5)),
-    )
+            child: _previewing
+                ? const CircularProgressIndicator(strokeWidth: 3)
+                : Icon(Icons.image_not_supported_outlined, color: scheme.onSurface.withValues(alpha: 0.5)),
+          )
         : Stack(
-      fit: StackFit.expand,
-      children: [
-        Image.memory(
-          bytes,
-          fit: BoxFit.contain,
-          cacheWidth: 700,
-          gaplessPlayback: true,
-          errorBuilder: (_, _, _) => Center(
-            child: Text(
-              'Preview not available\nfor ${_target.label}',
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 12),
-            ),
-          ),
-        ),
-        if (_previewing)
-          const Align(
-            alignment: Alignment.topRight,
-            child: Padding(
-              padding: EdgeInsets.all(8),
-              child: SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(strokeWidth: 2.5),
+            fit: StackFit.expand,
+            children: [
+              Image.memory(
+                bytes,
+                fit: BoxFit.contain,
+                cacheWidth: 700,
+                gaplessPlayback: true,
+                errorBuilder: (_, _, _) => Center(
+                  child: Text(
+                    'Preview not available\nfor ${_target.label}',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ),
               ),
-            ),
-          ),
-      ],
-    );
+              if (_previewing)
+                const Align(
+                  alignment: Alignment.topRight,
+                  child: Padding(
+                    padding: EdgeInsets.all(8),
+                    child: SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2.5),
+                    ),
+                  ),
+                ),
+            ],
+          );
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
@@ -314,12 +313,12 @@ class _ConvertImagesScreenState extends State<ConvertImagesScreen> {
   }
 
   Widget _hint(ColorScheme scheme, String text) => Padding(
-    padding: const EdgeInsets.only(top: 6),
-    child: Text(
-      text,
-      style: TextStyle(color: scheme.onSurface.withValues(alpha: 0.6), fontSize: 12),
-    ),
-  );
+        padding: const EdgeInsets.only(top: 6),
+        child: Text(
+          text,
+          style: TextStyle(color: scheme.onSurface.withValues(alpha: 0.6), fontSize: 12),
+        ),
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -332,8 +331,8 @@ class _ConvertImagesScreenState extends State<ConvertImagesScreen> {
           widget.share
               ? 'Compress for sharing'
               : widget.keepFormat
-              ? 'Resize and compress'
-              : 'Convert images',
+                  ? 'Resize and compress'
+                  : 'Convert images',
         ),
       ),
       body: ListView(
@@ -376,10 +375,10 @@ class _ConvertImagesScreenState extends State<ConvertImagesScreen> {
                     onSelected: _running
                         ? null
                         : (_) => _optionChanged(() {
-                      _preset = p.label;
-                      _maxSide = p.side;
-                      _quality = p.quality.toDouble();
-                    }),
+                              _preset = p.label;
+                              _maxSide = p.side;
+                              _quality = p.quality.toDouble();
+                            }),
                   ),
               ],
             ),
@@ -388,7 +387,7 @@ class _ConvertImagesScreenState extends State<ConvertImagesScreen> {
               _preset == null
                   ? 'Pick one, or set the size and quality yourself below.'
                   : '${_presets.firstWhere((p) => p.label == _preset).hint}. '
-                  'Photos are shrunk on your phone. Nothing is uploaded.',
+                      'Photos are shrunk on your phone. Nothing is uploaded.',
             ),
           ],
           const SizedBox(height: 20),
@@ -405,9 +404,9 @@ class _ConvertImagesScreenState extends State<ConvertImagesScreen> {
                   onSelected: _running
                       ? null
                       : (_) => _optionChanged(() {
-                    _maxSide = size;
-                    _preset = null;
-                  }),
+                            _maxSide = size;
+                            _preset = null;
+                          }),
                 ),
             ],
           ),
@@ -429,9 +428,9 @@ class _ConvertImagesScreenState extends State<ConvertImagesScreen> {
               onChanged: _running
                   ? null
                   : (v) => _optionChanged(() {
-                _quality = v;
-                _preset = null;
-              }),
+                        _quality = v;
+                        _preset = null;
+                      }),
             ),
             _hint(
               scheme,
@@ -457,14 +456,14 @@ class _ConvertImagesScreenState extends State<ConvertImagesScreen> {
             onPressed: _running
                 ? null
                 : _finished
-                ? () => Navigator.pop(context)
-                : _run,
+                    ? () => Navigator.pop(context)
+                    : _run,
             child: Text(
               _running
                   ? 'Working…'
                   : _finished
-                  ? 'Done ($_doneCount saved)'
-                  : '${widget.keepFormat ? 'Shrink' : 'Convert'} $count ${count == 1 ? 'image' : 'images'}',
+                      ? 'Done ($_doneCount saved)'
+                      : '${widget.keepFormat ? 'Shrink' : 'Convert'} $count ${count == 1 ? 'image' : 'images'}',
             ),
           ),
         ),
@@ -485,10 +484,10 @@ class _JobRow extends StatelessWidget {
     final Widget trailing = switch (job.status) {
       _Status.waiting => const SizedBox.shrink(),
       _Status.working => const SizedBox(
-        width: 20,
-        height: 20,
-        child: CircularProgressIndicator(strokeWidth: 2),
-      ),
+          width: 20,
+          height: 20,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
       _Status.done => Icon(Icons.check_circle, color: scheme.primary),
       _Status.failed => Icon(Icons.error_outline, color: scheme.error),
       _Status.skipped => Icon(Icons.remove_circle_outline, color: scheme.onSurface.withValues(alpha: 0.5)),

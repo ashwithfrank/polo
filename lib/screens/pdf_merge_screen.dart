@@ -5,6 +5,7 @@ import '../services/file_service.dart';
 import '../services/pdf_tools_service.dart';
 import '../widgets/pdf_result.dart';
 import 'pick_files_screen.dart';
+import '../services/output_location.dart';
 
 /// Joins several PDFs into one, in the order shown.
 class PdfMergeScreen extends StatefulWidget {
@@ -115,7 +116,7 @@ class _PdfMergeScreenState extends State<PdfMergeScreen> {
               decoration: InputDecoration(
                 labelText: 'File name',
                 suffixText: '.pdf',
-                helperText: 'Saved next to the first PDF',
+                helperText: OutputLocation.hint('the first PDF', OutputKind.documents),
                 errorText: _nameError,
               ),
               onChanged: (_) {
@@ -154,8 +155,8 @@ class _PdfMergeScreenState extends State<PdfMergeScreen> {
         onReorderItem: locked
             ? (_, _) {}
             : (oldIndex, newIndex) => setState(() {
-          _files.insert(newIndex, _files.removeAt(oldIndex));
-        }),
+                  _files.insert(newIndex, _files.removeAt(oldIndex));
+                }),
         itemBuilder: (context, i) {
           final f = _files[i];
           return ListTile(
@@ -175,22 +176,22 @@ class _PdfMergeScreenState extends State<PdfMergeScreen> {
             trailing: locked
                 ? null
                 : Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  tooltip: 'Remove',
-                  icon: const Icon(Icons.close),
-                  onPressed: () => setState(() => _files.removeAt(i)),
-                ),
-                ReorderableDragStartListener(
-                  index: i,
-                  child: const Padding(
-                    padding: EdgeInsets.all(8),
-                    child: Icon(Icons.drag_handle),
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        tooltip: 'Remove',
+                        icon: const Icon(Icons.close),
+                        onPressed: () => setState(() => _files.removeAt(i)),
+                      ),
+                      ReorderableDragStartListener(
+                        index: i,
+                        child: const Padding(
+                          padding: EdgeInsets.all(8),
+                          child: Icon(Icons.drag_handle),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ],
-            ),
           );
         },
       ),
@@ -199,10 +200,10 @@ class _PdfMergeScreenState extends State<PdfMergeScreen> {
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
           child: saved == null
               ? FilledButton(
-            style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
-            onPressed: _busy ? null : _merge,
-            child: Text(_busy ? 'Merging…' : 'Merge PDFs'),
-          )
+                  style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+                  onPressed: _busy ? null : _merge,
+                  child: Text(_busy ? 'Merging…' : 'Merge PDFs'),
+                )
               : SavedActions(openPath: saved),
         ),
       ),

@@ -3,10 +3,14 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../services/settings_controller.dart';
+
 // Small, shared animation helpers. All of them switch themselves off when the
 // person has "Remove animations" turned on in Android's accessibility settings.
 
-bool reduceMotion(BuildContext context) => MediaQuery.of(context).disableAnimations;
+bool reduceMotion(BuildContext context) =>
+    MediaQuery.of(context).disableAnimations ||
+    !(SettingsController.current?.animations ?? true);
 
 /// [ms] milliseconds, or zero when animations are turned off.
 Duration motion(BuildContext context, int ms) =>

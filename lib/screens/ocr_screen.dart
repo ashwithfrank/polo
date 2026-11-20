@@ -11,6 +11,7 @@ import '../services/ocr_service.dart';
 import '../widgets/pdf_result.dart';
 import '../widgets/polo_message.dart';
 import 'pick_files_screen.dart';
+import '../services/output_location.dart';
 
 /// Asks where the picture comes from, then opens the reader.
 Future<void> startOcr(BuildContext context) async {
@@ -72,9 +73,12 @@ Future<void> startOcr(BuildContext context) async {
 
 /// Shows the text found in one picture, ready to edit, copy, share or save.
 class OcrScreen extends StatefulWidget {
-  const OcrScreen({super.key, required this.path, this.saveDir});
+  const OcrScreen({super.key, required this.path, this.saveDir, this.preloaded});
 
   final String path;
+
+  /// Text that was already read (from a PDF). The picture is then not shown.
+  final String? preloaded;
 
   /// Where "Save as text" puts the file. Null means Documents/Scanned text.
   final String? saveDir;
@@ -92,7 +96,13 @@ class _OcrScreenState extends State<OcrScreen> {
   @override
   void initState() {
     super.initState();
-    _read();
+    final pre = widget.preloaded;
+    if (pre != null) {
+      _text.text = pre;
+      _reading = false;
+    } else {
+      _read();
+    }
   }
 
   @override
@@ -102,6 +112,10 @@ class _OcrScreenState extends State<OcrScreen> {
   }
 
   Future<void> _read() async {
+    setState(() {
+      _reading = true;
+      _failed = false;
+    });
     try {
       final text = await OcrService.read(widget.path);
       if (!mounted) return;
@@ -119,7 +133,11 @@ class _OcrScreenState extends State<OcrScreen> {
 
   Future<void> _save() async {
     try {
-      final dir = widget.saveDir ?? '${FileService.rootPath}/Documents/Scanned text';
+      final dir = await OutputLocation.resolve(
+        widget.saveDir ?? '${FileService.rootPath}/Documents/Scanned text',
+        OutputKind.documents,
+        fromScratch: widget.saveDir == null,
+      );
       await Directory(dir).create(recursive: true);
       final name = widget.path.split('/').last;
       final path = await FileService().uniquePath(dir, '${baseName(name)} (text).txt');
@@ -136,10 +154,13 @@ class _OcrScreenState extends State<OcrScreen> {
     final hasText = _text.text.trim().isNotEmpty;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Text from picture')),
+      appBar: AppBar(
+        title: Text(widget.preloaded != null ? 'Text from PDF' : 'Text from picture'),
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          if (widget.preloaded == null) ...[
           ClipRRect(
             borderRadius: BorderRadius.circular(16),
             child: SizedBox(
@@ -155,6 +176,27 @@ class _OcrScreenState extends State<OcrScreen> {
               ),
             ),
           ),
+          const SizedBox(height: 12),
+          SegmentedButton<OcrScript>(
+            showSelectedIcon: false,
+            segments: [
+              for (final o in OcrScript.values)
+                ButtonSegment(value: o, label: Text(o == OcrScript.latin ? 'Latin' : 'Devanagari')),
+            ],
+            selected: {OcrService.last},
+            onSelectionChanged: _reading
+                ? null
+                : (v) {
+                    OcrService.last = v.first;
+                    _read();
+                  },
+          ),
+          const SizedBox(height: 4),
+          Text(
+            OcrService.last.label,
+            style: TextStyle(fontSize: 12, color: scheme.onSurface.withValues(alpha: 0.6)),
+          ),
+          ],
           const SizedBox(height: 16),
           if (_reading)
             const Padding(
@@ -172,67 +214,69 @@ class _OcrScreenState extends State<OcrScreen> {
           else if (_failed)
             Text("Couldn't read this picture", style: TextStyle(color: scheme.error))
           else ...[
-              if (_savedAs != null) ...[
-                SavedBanner(text: 'Saved as ${_savedAs!.split('/').last}'),
-                const SizedBox(height: 12),
-              ],
-              TextField(
-                controller: _text,
-                minLines: 8,
-                maxLines: null,
-                keyboardType: TextInputType.multiline,
-                onChanged: (_) => setState(() => _savedAs = null),
-                decoration: const InputDecoration(
-                  alignLabelWithHint: true,
-                  labelText: 'Text',
-                  hintText: 'No text was found in this picture',
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Works best with clear, straight, well lit text. Reads English and other '
-                    'languages written in the Latin alphabet. You can fix mistakes above.',
-                style: TextStyle(fontSize: 12, color: scheme.onSurface.withValues(alpha: 0.6)),
-              ),
+            if (_savedAs != null) ...[
+              SavedBanner(text: 'Saved as ${_savedAs!.split('/').last}'),
+              const SizedBox(height: 12),
             ],
+            TextField(
+              controller: _text,
+              minLines: 8,
+              maxLines: null,
+              keyboardType: TextInputType.multiline,
+              onChanged: (_) => setState(() => _savedAs = null),
+              decoration: const InputDecoration(
+                alignLabelWithHint: true,
+                labelText: 'Text',
+                hintText: 'No text was found in this picture',
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              widget.preloaded != null
+                  ? 'Scanned pages are read one by one. You can fix mistakes above.'
+                  : 'Works best with clear, straight, well lit text. Pick the writing '
+                      'system above if the result looks wrong. You can fix mistakes above.',
+              style: TextStyle(fontSize: 12, color: scheme.onSurface.withValues(alpha: 0.6)),
+            ),
+          ],
         ],
       ),
       bottomNavigationBar: _reading || _failed
           ? null
           : SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-          child: Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: hasText ? _copy : null,
-                  icon: const Icon(Icons.copy),
-                  label: const Text('Copy'),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: hasText ? _copy : null,
+                        icon: const Icon(Icons.copy),
+                        label: const Text('Copy'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: hasText
+                            ? () => SharePlus.instance.share(ShareParams(text: _text.text))
+                            : null,
+                        icon: const Icon(Icons.share),
+                        label: const Text('Share'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: hasText && _savedAs == null ? _save : null,
+                        icon: const Icon(Icons.save_alt),
+                        label: const Text('Save'),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: hasText
-                      ? () => SharePlus.instance.share(ShareParams(text: _text.text))
-                      : null,
-                  icon: const Icon(Icons.share),
-                  label: const Text('Share'),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: FilledButton.icon(
-                  onPressed: hasText && _savedAs == null ? _save : null,
-                  icon: const Icon(Icons.save_alt),
-                  label: const Text('Save'),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+            ),
     );
   }
 }

@@ -6,6 +6,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
 import 'file_service.dart';
+import './output_location.dart';
 
 enum PdfPageMode { a4, a5, letter, fit }
 
@@ -38,23 +39,23 @@ class PdfService {
     PdfOrientation orientation = PdfOrientation.auto,
     PdfMargin margin = PdfMargin.normal,
   }) async {
-    final outPath = await _files.uniquePath(dir, fileName);
+    final outPath = await _files.uniquePath(await OutputLocation.resolve(dir, OutputKind.documents), fileName);
     // Decoding photos is heavy, so build the whole PDF off the UI thread.
     await Isolate.run(
-          () => _buildPdf(imagePaths, outPath, mode, quality, orientation, margin),
+      () => _buildPdf(imagePaths, outPath, mode, quality, orientation, margin),
     );
     return outPath;
   }
 }
 
 Future<void> _buildPdf(
-    List<String> paths,
-    String outPath,
-    PdfPageMode mode,
-    int quality,
-    PdfOrientation orientation,
-    PdfMargin pageMargin,
-    ) async {
+  List<String> paths,
+  String outPath,
+  PdfPageMode mode,
+  int quality,
+  PdfOrientation orientation,
+  PdfMargin pageMargin,
+) async {
   final doc = pw.Document();
 
   for (final path in paths) {

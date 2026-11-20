@@ -29,11 +29,13 @@ import '../tools/tool_actions.dart';
 import 'file_actions.dart';
 import 'file_details.dart';
 import 'file_tile.dart';
+import '../screens/pdf_ocr_screen.dart';
 import 'name_dialog.dart';
 import 'open_external.dart';
 import 'open_file.dart';
 import 'polo_message.dart';
 import 'progress_dialog.dart';
+import '../screens/media_convert_screen.dart';
 
 /// One thing you can do to a file. [run] returns true if the folder's
 /// contents may have changed, so the caller should refresh.
@@ -62,23 +64,23 @@ Future<bool> showQuickActions(BuildContext context, FileItem item) async {
     builder: (sheet) {
       final (icon, color) = fileIconFor(item.kind, scheme);
       Widget section(String title, List<_Action> actions) => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
-            child: Text(
-              title,
-              style: TextStyle(color: scheme.primary, fontWeight: FontWeight.w600, fontSize: 13),
-            ),
-          ),
-          for (final a in actions)
-            ListTile(
-              leading: Icon(a.icon, color: a.danger ? scheme.error : null),
-              title: Text(a.label, style: TextStyle(color: a.danger ? scheme.error : null)),
-              onTap: () => Navigator.pop(sheet, a),
-            ),
-        ],
-      );
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
+                child: Text(
+                  title,
+                  style: TextStyle(color: scheme.primary, fontWeight: FontWeight.w600, fontSize: 13),
+                ),
+              ),
+              for (final a in actions)
+                ListTile(
+                  leading: Icon(a.icon, color: a.danger ? scheme.error : null),
+                  title: Text(a.label, style: TextStyle(color: a.danger ? scheme.error : null)),
+                  onTap: () => Navigator.pop(sheet, a),
+                ),
+            ],
+          );
 
       return SafeArea(
         child: Column(
@@ -200,31 +202,46 @@ List<_Action> _typeActions(FileItem item) {
     }
     out.addAll([
       _Action(Icons.transform, 'Convert format',
-              (c) => _push(c, ConvertImagesScreen(files: [item]))),
+          (c) => _push(c, ConvertImagesScreen(files: [item]))),
       _Action(Icons.photo_size_select_large_outlined, 'Resize and compress',
-              (c) => _push(c, ConvertImagesScreen(files: [item], keepFormat: true))),
+          (c) => _push(c, ConvertImagesScreen(files: [item], keepFormat: true))),
       _Action(Icons.send_outlined, 'Compress for sharing',
-              (c) => _push(c, ConvertImagesScreen(files: [item], keepFormat: true, share: true))),
+          (c) => _push(c, ConvertImagesScreen(files: [item], keepFormat: true, share: true))),
       _Action(Icons.picture_as_pdf_outlined, 'Make a PDF',
-              (c) => _push(c, ImagesToPdfScreen(files: [item]))),
+          (c) => _push(c, ImagesToPdfScreen(files: [item]))),
       _Action(Icons.text_fields, 'Text from picture',
-              (c) => _push(c, OcrScreen(path: item.path, saveDir: item.parentPath))),
+          (c) => _push(c, OcrScreen(path: item.path, saveDir: item.parentPath))),
       _Action(Icons.camera_alt_outlined, 'Photo info',
-              (c) => _push(c, PhotoInfoScreen(item: item))),
+          (c) => _push(c, PhotoInfoScreen(item: item))),
     ]);
     if (strippableExtensions.contains(item.extension)) {
       out.add(_Action(Icons.privacy_tip_outlined, 'Remove metadata',
-              (c) => _push(c, StripMetadataScreen(files: [item]))));
+          (c) => _push(c, StripMetadataScreen(files: [item]))));
     }
+  }
+
+  if (item.kind == FileKind.video) {
+    out.addAll([
+      _Action(Icons.compress, 'Compress video',
+          (c) => _push(c, MediaConvertScreen(item: item, job: MediaJob.compressVideo))),
+      _Action(Icons.audiotrack_outlined, 'Save the sound',
+          (c) => _push(c, MediaConvertScreen(item: item, job: MediaJob.videoToAudio))),
+    ]);
+  }
+  if (item.kind == FileKind.audio) {
+    out.add(_Action(Icons.music_note_outlined, 'Convert to M4A',
+        (c) => _push(c, MediaConvertScreen(item: item, job: MediaJob.toM4a))));
   }
 
   if (item.kind == FileKind.pdf) {
     out.addAll([
       _Action(Icons.call_split, 'Split', (c) => _push(c, PdfSplitScreen(item: item))),
       _Action(Icons.view_carousel_outlined, 'Organize pages',
-              (c) => _push(c, PdfOrganizeScreen(item: item))),
+          (c) => _push(c, PdfOrganizeScreen(item: item))),
       _Action(Icons.image_outlined, 'Save pages as pictures',
-              (c) => _push(c, PdfToImagesScreen(item: item))),
+          (c) => _push(c, PdfToImagesScreen(item: item))),
+      _Action(Icons.document_scanner_outlined, 'Read scanned text (OCR)',
+          (c) => _push(c, PdfOcrScreen(item: item))),
       _Action(Icons.text_snippet_outlined, 'Extract text', (c) async {
         await pdfToText(c, item);
         return true;
@@ -320,7 +337,7 @@ Future<bool> Function(BuildContext) _extract(FileItem item) {
       final result = await runWithProgress(
         context,
         'Extracting ${item.name}…',
-            () => ArchiveService(FileService()).extractZip(item),
+        () => ArchiveService(FileService()).extractZip(item),
       );
       if (context.mounted) {
         showPoloMessage(

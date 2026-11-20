@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
+import 'motion.dart';
+
 import '../models/file_item.dart';
 import 'file_tile.dart';
 
@@ -38,16 +40,17 @@ class FileGridTile extends StatelessWidget {
 
     final Widget preview = item.kind == FileKind.image
         ? Image.file(
-      File(item.path),
-      fit: BoxFit.cover,
-      cacheWidth: 360,
-      filterQuality: FilterQuality.low,
-      gaplessPlayback: true,
-      errorBuilder: (_, _, _) => iconBox,
-    )
+            File(item.path),
+            fit: BoxFit.cover,
+            cacheWidth: 360,
+            filterQuality: FilterQuality.low,
+            gaplessPlayback: true,
+            errorBuilder: (_, _, _) => iconBox,
+          )
         : iconBox;
 
-    return InkWell(
+    return PressScale(
+      child: InkWell(
       borderRadius: BorderRadius.circular(14),
       onTap: onTap,
       onLongPress: onLongPress,
@@ -112,6 +115,7 @@ class FileGridTile extends StatelessWidget {
             style: TextStyle(fontSize: 11, color: scheme.onSurface.withValues(alpha: 0.6)),
           ),
         ],
+      ),
       ),
     );
   }

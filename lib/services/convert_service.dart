@@ -7,6 +7,7 @@ import 'package:image/image.dart' as img;
 
 import '../models/file_item.dart';
 import 'file_service.dart';
+import './output_location.dart';
 
 enum ImageTarget { png, jpg, webp, bmp, gif, ico, tiff }
 
@@ -19,15 +20,15 @@ extension ImageTargetX on ImageTarget {
 
   /// The format for a file extension, or null if Polo can't write it.
   static ImageTarget? fromExtension(String ext) => switch (ext) {
-    'png' => ImageTarget.png,
-    'jpg' || 'jpeg' => ImageTarget.jpg,
-    'webp' => ImageTarget.webp,
-    'bmp' => ImageTarget.bmp,
-    'gif' => ImageTarget.gif,
-    'ico' => ImageTarget.ico,
-    'tif' || 'tiff' => ImageTarget.tiff,
-    _ => null,
-  };
+        'png' => ImageTarget.png,
+        'jpg' || 'jpeg' => ImageTarget.jpg,
+        'webp' => ImageTarget.webp,
+        'bmp' => ImageTarget.bmp,
+        'gif' => ImageTarget.gif,
+        'ico' => ImageTarget.ico,
+        'tif' || 'tiff' => ImageTarget.tiff,
+        _ => null,
+      };
 }
 
 class ConvertResult {
@@ -86,13 +87,13 @@ class ConvertService {
   /// [target] null keeps the image's own format. [maxSide] limits the longest
   /// side in pixels (images are never enlarged).
   Future<ConvertResult> convertImage(
-      FileItem item, {
-        ImageTarget? target,
-        int quality = 90,
-        int? maxSide,
-      }) async {
+    FileItem item, {
+    ImageTarget? target,
+    int quality = 90,
+    int? maxSide,
+  }) async {
     final out = target ?? ImageTargetX.fromExtension(item.extension) ?? ImageTarget.png;
-    final dir = item.parentPath;
+    final dir = await OutputLocation.resolve(item.parentPath, OutputKind.images);
     final dot = item.name.lastIndexOf('.');
     final base = dot > 0 ? item.name.substring(0, dot) : item.name;
 
@@ -105,6 +106,7 @@ class ConvertService {
     final bytes = await encode(item, out, quality, maxSide);
 
     await File(outPath).writeAsBytes(bytes, flush: true);
+    OutputLocation.announce(outPath);
     return ConvertResult(path: outPath, bytes: bytes.length);
   }
 }

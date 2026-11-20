@@ -1,7 +1,6 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:share_plus/share_plus.dart';
@@ -15,6 +14,7 @@ import '../services/convert_service.dart';
 import '../services/settings_controller.dart';
 import '../services/file_service.dart';
 import '../services/trash_service.dart';
+import '../widgets/drag_select.dart';
 import '../widgets/file_details.dart';
 import '../widgets/file_grid_tile.dart';
 import '../widgets/file_tile.dart';
@@ -25,6 +25,7 @@ import 'convert_images_screen.dart';
 import 'images_to_pdf_screen.dart';
 import '../widgets/polo_message.dart';
 import '../widgets/quick_actions.dart';
+import '../widgets/haptics.dart';
 
 class BrowseScreen extends StatefulWidget {
   const BrowseScreen({
@@ -57,6 +58,7 @@ class _BrowseScreenState extends State<BrowseScreen> with WidgetsBindingObserver
   final _service = FileService();
   late final _archive = ArchiveService(_service);
   final _crumbScroll = ScrollController();
+  final _listScroll = ScrollController();
 
   bool? _granted;
   String _path = FileService.rootPath;
@@ -92,6 +94,7 @@ class _BrowseScreenState extends State<BrowseScreen> with WidgetsBindingObserver
     widget.jumpTo?.removeListener(_onJump);
     widget.settings.removeListener(_onSettings);
     _crumbScroll.dispose();
+    _listScroll.dispose();
     super.dispose();
   }
 
@@ -210,7 +213,7 @@ class _BrowseScreenState extends State<BrowseScreen> with WidgetsBindingObserver
   // ---------------------------------------------------------------------------
 
   void _toggle(FileItem item) {
-    HapticFeedback.selectionClick();
+    Haptics.select();
     setState(() {
       if (!_selected.remove(item.path)) _selected.add(item.path);
     });
@@ -455,7 +458,7 @@ class _BrowseScreenState extends State<BrowseScreen> with WidgetsBindingObserver
       created = await runWithProgress(
         context,
         'Compressing to $name.zip…',
-            () => _archive.createZip(items, _path, '$name.zip'),
+        () => _archive.createZip(items, _path, '$name.zip'),
       );
     } on FileSystemException catch (e) {
       error = e.message;
@@ -476,7 +479,7 @@ class _BrowseScreenState extends State<BrowseScreen> with WidgetsBindingObserver
       result = await runWithProgress(
         context,
         'Extracting ${item.name}…',
-            () => _archive.extractZip(item),
+        () => _archive.extractZip(item),
       );
     } catch (_) {
       error = "Couldn't extract this ZIP. It may be damaged or password protected.";
@@ -843,42 +846,60 @@ class _BrowseScreenState extends State<BrowseScreen> with WidgetsBindingObserver
         body: 'Files you add here will show up in this list.',
       );
     }
-    return RefreshIndicator(
+    return DragSelectArea(
+      order: [for (final i in _items) i.path],
+      selected: _selected,
+      holdFor: Duration(milliseconds: widget.settings.longPressMs),
+      drag: widget.settings.dragSelect,
+      scroll: _listScroll,
+      onChanged: (next) => setState(() {
+        _selected
+          ..clear()
+          ..addAll(next);
+      }),
+      child: RefreshIndicator(
       onRefresh: () => _load(_path, showSpinner: false),
       child: widget.settings.gridView
           ? GridView.builder(
-        padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
-        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-          maxCrossAxisExtent: 130,
-          mainAxisSpacing: 10,
-          crossAxisSpacing: 10,
-          childAspectRatio: 0.82,
-        ),
-        itemCount: _items.length,
-        itemBuilder: (context, i) {
-          final item = _items[i];
-          return FileGridTile(
-            item: item,
-            selected: _selected.contains(item.path),
-            onTap: () => _onTap(item),
-            onLongPress: () => _toggle(item),
-            onMore: _selecting ? null : () => _quick(item),
-          );
-        },
-      )
+              padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
+              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                maxCrossAxisExtent: 130,
+                mainAxisSpacing: 10,
+                crossAxisSpacing: 10,
+                childAspectRatio: 0.82,
+              ),
+              itemCount: _items.length,
+              controller: _listScroll,
+              itemBuilder: (context, i) {
+                final item = _items[i];
+                return DragSelectItem(
+                  path: item.path,
+                  child: FileGridTile(
+                    item: item,
+                    selected: _selected.contains(item.path),
+                    onTap: () => _onTap(item),
+                    onMore: _selecting ? null : () => _quick(item),
+                  ),
+                );
+              },
+            )
           : ListView.builder(
+        controller: _listScroll,
         padding: const EdgeInsets.only(bottom: 16),
         itemCount: _items.length,
         itemBuilder: (context, i) {
           final item = _items[i];
-          return FileTile(
-            item: item,
-            selected: _selected.contains(item.path),
-            onTap: () => _onTap(item),
-            onLongPress: () => _toggle(item),
-            onMore: _selecting ? null : () => _quick(item),
+          return DragSelectItem(
+            path: item.path,
+            child: FileTile(
+              item: item,
+              selected: _selected.contains(item.path),
+              onTap: () => _onTap(item),
+              onMore: _selecting ? null : () => _quick(item),
+            ),
           );
         },
+      ),
       ),
     );
   }

@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+
+import '../widgets/haptics.dart';
+import '../widgets/pdf_result.dart';
 import 'package:flutter/services.dart';
 
 import '../models/file_item.dart';
@@ -52,6 +55,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    FolderJump.request.addListener(_onFolderJump);
     _storage.load();
     // Clear out trash older than 30 days. Best effort.
     TrashService().purgeOld().catchError((_) {});
@@ -66,6 +70,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    FolderJump.request.removeListener(_onFolderJump);
     WidgetsBinding.instance.removeObserver(this);
     IncomingService.stopListening();
     _storage.dispose();
@@ -83,10 +88,18 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   }
 
   void _select(int i) {
+    if (i != _index) Haptics.select();
     // Files may have changed while the user was in Browse or Tools.
     if (_index == 1 || _index == 2) _storage.markStale();
     setState(() => _index = i);
     if (i == 0 || i == 3) _storage.loadIfStale();
+  }
+
+  void _onFolderJump() {
+    final path = FolderJump.request.value;
+    if (path == null) return;
+    FolderJump.request.value = null;
+    _openFolder(path);
   }
 
   void _openFolder(String path) {
@@ -153,7 +166,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
       items = await runWithProgress(
         context,
         'Opening…',
-            () => IncomingService.resolveAll(incoming.files),
+        () => IncomingService.resolveAll(incoming.files),
       );
     } catch (e) {
       if (mounted) {
@@ -217,92 +230,92 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
         if (!didPop) _onBack();
       },
       child: Scaffold(
-        appBar: AppBar(
-          title: Text(
-            _titles[_index],
-            style: const TextStyle(fontWeight: FontWeight.w600),
-          ),
-          actions: [
-            // Home has its own search bar and Tools its own tool search, so the
-            // app bar search only shows where there is no other one: Browse.
-            if (_index == 1)
-              IconButton(
-                tooltip: 'Search files',
-                icon: const Icon(Icons.search),
-                onPressed: _openSearch,
-              ),
+      appBar: AppBar(
+        title: Text(
+          _titles[_index],
+          style: const TextStyle(fontWeight: FontWeight.w600),
+        ),
+        actions: [
+          // Home has its own search bar and Tools its own tool search, so the
+          // app bar search only shows where there is no other one: Browse.
+          if (_index == 1)
             IconButton(
-              tooltip: 'Settings',
-              icon: const Icon(Icons.settings_outlined),
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => SettingsScreen(
-                    themeController: widget.themeController,
-                    settings: widget.settings,
-                  ),
+              tooltip: 'Search files',
+              icon: const Icon(Icons.search),
+              onPressed: _openSearch,
+            ),
+          IconButton(
+            tooltip: 'Settings',
+            icon: const Icon(Icons.settings_outlined),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => SettingsScreen(
+                  themeController: widget.themeController,
+                  settings: widget.settings,
                 ),
               ),
             ),
-          ],
-        ),
-        body: IndexedStack(
-          index: _index,
-          children: [
-            TabFade(
-              active: _index == 0,
-              child: HomeScreen(
-                controller: _storage,
-                settings: widget.settings,
-                onOpenFolder: _openFolder,
-                onOpenStorage: () => _select(3),
-                onSearch: _openSearch,
-                onOpenCategory: _openCategory,
-                onOpenVault: _openVault,
-              ),
-            ),
-            TabFade(
-              active: _index == 1,
-              child: BrowseScreen(
-                active: _index == 1,
-                jumpTo: _jump,
-                settings: widget.settings,
-                handlesBack: _browseHandlesBack,
-              ),
-            ),
-            TabFade(active: _index == 2, child: ToolsScreen(settings: widget.settings)),
-            TabFade(
-              active: _index == 3,
-              child: StorageScreen(controller: _storage, onOpenCategory: _openCategory),
-            ),
-          ],
-        ),
-        bottomNavigationBar: NavigationBar(
-          selectedIndex: _index,
-          onDestinationSelected: _select,
-          destinations: const [
-            NavigationDestination(
-              icon: Icon(Icons.home_outlined),
-              selectedIcon: Icon(Icons.home),
-              label: 'Home',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.folder_outlined),
-              selectedIcon: Icon(Icons.folder),
-              label: 'Browse',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.handyman_outlined),
-              selectedIcon: Icon(Icons.handyman),
-              label: 'Tools',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.pie_chart_outline),
-              selectedIcon: Icon(Icons.pie_chart),
-              label: 'Storage',
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
+      body: IndexedStack(
+        index: _index,
+        children: [
+          TabFade(
+            active: _index == 0,
+            child: HomeScreen(
+              controller: _storage,
+              settings: widget.settings,
+              onOpenFolder: _openFolder,
+              onOpenStorage: () => _select(3),
+              onSearch: _openSearch,
+              onOpenCategory: _openCategory,
+              onOpenVault: _openVault,
+            ),
+          ),
+          TabFade(
+            active: _index == 1,
+            child: BrowseScreen(
+              active: _index == 1,
+              jumpTo: _jump,
+              settings: widget.settings,
+              handlesBack: _browseHandlesBack,
+            ),
+          ),
+          TabFade(active: _index == 2, child: ToolsScreen(settings: widget.settings)),
+          TabFade(
+            active: _index == 3,
+            child: StorageScreen(controller: _storage, onOpenCategory: _openCategory),
+          ),
+        ],
+      ),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _index,
+        onDestinationSelected: _select,
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.home_outlined),
+            selectedIcon: Icon(Icons.home),
+            label: 'Home',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.folder_outlined),
+            selectedIcon: Icon(Icons.folder),
+            label: 'Browse',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.handyman_outlined),
+            selectedIcon: Icon(Icons.handyman),
+            label: 'Tools',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.pie_chart_outline),
+            selectedIcon: Icon(Icons.pie_chart),
+            label: 'Storage',
+          ),
+        ],
+      ),
+    ),
     );
   }
 }

@@ -30,6 +30,8 @@ import '../services/file_service.dart';
 import '../widgets/name_dialog.dart';
 import '../widgets/progress_dialog.dart';
 import '../widgets/polo_message.dart';
+import '../screens/pdf_ocr_screen.dart';
+import '../screens/media_convert_screen.dart';
 
 // What each tool does when it is tapped. The list of tools is in
 // tools_registry.dart.
@@ -148,7 +150,7 @@ Future<void> runZipTools(BuildContext context) async {
       final out = await runWithProgress(
         context,
         'Compressing…',
-            () => service.createZip(picked, first.parentPath, '$name.zip'),
+        () => service.createZip(picked, first.parentPath, '$name.zip'),
       );
       if (context.mounted) toast('Created ${out.split('/').last}');
     } catch (e) {
@@ -301,14 +303,39 @@ Future<void> runStripMetadata(BuildContext context) async {
 bool _isPdf(FileItem item) => !item.isDirectory && item.extension == 'pdf';
 
 Future<List<FileItem>?> _pickPdfs(
-    BuildContext context, {
-      required String title,
-      bool single = false,
-    }) {
+  BuildContext context, {
+  required String title,
+  bool single = false,
+}) {
   return Navigator.of(context).push<List<FileItem>>(
     MaterialPageRoute(
       builder: (_) => PickFilesScreen(title: title, accepts: _isPdf, single: single),
     ),
+  );
+}
+
+Future<void> runMedia(BuildContext context, MediaJob job) async {
+  final video = job != MediaJob.toM4a;
+  final picked = await Navigator.of(context).push<List<FileItem>>(
+    MaterialPageRoute(
+      builder: (_) => PickFilesScreen(
+        title: video ? 'Choose a video' : 'Choose an audio file',
+        accepts: (f) => !f.isDirectory && f.kind == (video ? FileKind.video : FileKind.audio),
+        single: true,
+      ),
+    ),
+  );
+  if (picked == null || picked.isEmpty || !context.mounted) return;
+  await Navigator.of(context).push(
+    MaterialPageRoute(builder: (_) => MediaConvertScreen(item: picked.first, job: job)),
+  );
+}
+
+Future<void> runPdfOcr(BuildContext context) async {
+  final picked = await _pickPdfs(context, title: 'Choose a scanned PDF', single: true);
+  if (picked == null || picked.isEmpty || !context.mounted) return;
+  await Navigator.of(context).push(
+    MaterialPageRoute(builder: (_) => PdfOcrScreen(item: picked.first)),
   );
 }
 
@@ -358,7 +385,7 @@ Future<void> pdfToText(BuildContext context, FileItem item) async {
     final result = await runWithProgress(
       context,
       'Reading text…',
-          () => PdfToolsService(FileService()).toText(
+      () => PdfToolsService(FileService()).toText(
         picked.first.path,
         onProgress: (done, total) => detail.value = 'Page $done of $total',
       ),

@@ -6,6 +6,7 @@ import '../models/file_item.dart';
 import '../services/file_service.dart';
 import '../services/image_meta.dart';
 import '../utils/format.dart';
+import '../services/output_location.dart';
 
 enum _Status { waiting, working, done, failed, skipped }
 
@@ -49,7 +50,7 @@ class _StripMetadataScreenState extends State<StripMetadataScreen> {
         final dot = item.name.lastIndexOf('.');
         final base = dot > 0 ? item.name.substring(0, dot) : item.name;
         final outPath = await _files.uniquePath(
-          item.parentPath,
+          await OutputLocation.resolve(item.parentPath, OutputKind.images),
           '${base}_clean.${item.extension}',
         );
         final result = await stripMetadataFile(item.path, outPath);
@@ -89,8 +90,8 @@ class _StripMetadataScreenState extends State<StripMetadataScreen> {
         children: [
           Text(
             'Removes the location, camera, date and other hidden details. '
-                'The picture itself is copied exactly, with no loss of quality, '
-                'and your original is never changed.',
+            'The picture itself is copied exactly, with no loss of quality, '
+            'and your original is never changed.',
             style: TextStyle(color: scheme.onSurface.withValues(alpha: 0.7)),
           ),
           const SizedBox(height: 20),
@@ -110,14 +111,14 @@ class _StripMetadataScreenState extends State<StripMetadataScreen> {
             onPressed: _running
                 ? null
                 : _finished
-                ? () => Navigator.pop(context)
-                : _run,
+                    ? () => Navigator.pop(context)
+                    : _run,
             child: Text(
               _running
                   ? 'Working…'
                   : _finished
-                  ? 'Done ($_doneCount saved)'
-                  : 'Clean $count ${count == 1 ? 'picture' : 'pictures'}',
+                      ? 'Done ($_doneCount saved)'
+                      : 'Clean $count ${count == 1 ? 'picture' : 'pictures'}',
             ),
           ),
         ),
@@ -130,14 +131,14 @@ class _StripMetadataScreenState extends State<StripMetadataScreen> {
     final Widget trailing = switch (job.status) {
       _Status.waiting => const SizedBox.shrink(),
       _Status.working => const SizedBox(
-        width: 20,
-        height: 20,
-        child: CircularProgressIndicator(strokeWidth: 2),
-      ),
+          width: 20,
+          height: 20,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
       _Status.done => Icon(Icons.check_circle, color: scheme.primary),
       _Status.failed => Icon(Icons.error_outline, color: scheme.error),
       _Status.skipped =>
-          Icon(Icons.remove_circle_outline, color: scheme.onSurface.withValues(alpha: 0.5)),
+        Icon(Icons.remove_circle_outline, color: scheme.onSurface.withValues(alpha: 0.5)),
     };
 
     return ListTile(

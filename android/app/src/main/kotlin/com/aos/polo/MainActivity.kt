@@ -37,9 +37,31 @@ class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
+        // Video compression and audio conversion.
+        val mediaChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.aos.polo/media")
+        val converter = MediaConverter(this, mediaChannel)
+        mediaChannel.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "convert" -> converter.convert(call.arguments as Map<*, *>, result)
+                "cancel" -> {
+                    converter.cancel()
+                    result.success(null)
+                }
+                else -> result.notImplemented()
+            }
+        }
+
         // Total and free space on internal storage (shown on the Home screen).
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "cos.aos.polo/storage")
             .setMethodCallHandler { call, result ->
+                if (call.method == "scanFile") {
+                    val path = call.argument<String>("path")
+                    if (path != null) {
+                        android.media.MediaScannerConnection.scanFile(this, arrayOf(path), null, null)
+                    }
+                    result.success(null)
+                    return@setMethodCallHandler
+                }
                 if (call.method != "getStorageInfo") {
                     result.notImplemented()
                     return@setMethodCallHandler

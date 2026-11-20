@@ -6,6 +6,7 @@ import 'package:image/image.dart' as img;
 import 'package:pdfrx/pdfrx.dart';
 
 import 'file_service.dart';
+import './output_location.dart';
 
 /// Merging, splitting, rotating and converting PDFs. Everything stays on the
 /// device. The PDF engine is the same one the PDF viewer uses.
@@ -48,7 +49,7 @@ class PdfToolsService {
 
   Future<String> _save(PdfDocument doc, String dir, String fileName) async {
     final bytes = await doc.encodePdf();
-    final outPath = await _files.uniquePath(dir, fileName);
+    final outPath = await _files.uniquePath(await OutputLocation.resolve(dir, OutputKind.documents), fileName);
     await File(outPath).writeAsBytes(bytes, flush: true);
     return outPath;
   }
@@ -90,14 +91,14 @@ class PdfToolsService {
   /// Saves each group of pages as its own PDF inside a new folder next to the
   /// original. Returns the folder's path.
   Future<String> splitToFolder(
-      String path,
-      List<List<int>> groups, {
-        required String folderName,
-        required String filePrefix,
-        void Function(int done, int total)? onProgress,
-      }) async {
+    String path,
+    List<List<int>> groups, {
+    required String folderName,
+    required String filePrefix,
+    void Function(int done, int total)? onProgress,
+  }) async {
     final dir = path.substring(0, path.lastIndexOf('/'));
-    final folder = await _files.uniquePath(dir, folderName);
+    final folder = await _files.uniquePath(await OutputLocation.resolve(dir, OutputKind.documents), folderName);
     await Directory(folder).create(recursive: true);
 
     final source = await open(path);
@@ -124,18 +125,18 @@ class PdfToolsService {
   /// Rebuilds the PDF from [edits]: pages in this order, each turned
   /// clockwise by its number of quarter turns. Pages left out are deleted.
   Future<String> organize(
-      String path,
-      List<PageEdit> edits,
-      String dir,
-      String fileName,
-      ) async {
+    String path,
+    List<PageEdit> edits,
+    String dir,
+    String fileName,
+  ) async {
     final source = await open(path);
     PdfDocument? out;
     try {
       out = await PdfDocument.createNew(sourceName: fileName);
       out.pages = [
         for (final e in edits)
-              () {
+          () {
             var page = source.pages[e.index];
             for (var i = 0; i < e.turns % 4; i++) {
               page = page.rotatedCW90();
@@ -180,17 +181,17 @@ class PdfToolsService {
   /// Saves the chosen pages as pictures in a new folder next to the PDF.
   /// Returns the folder's path.
   Future<String> toImages(
-      String path,
-      List<int> pages, {
-        required bool jpg,
-        required int dpi,
-        void Function(int done, int total)? onProgress,
-      }) async {
+    String path,
+    List<int> pages, {
+    required bool jpg,
+    required int dpi,
+    void Function(int done, int total)? onProgress,
+  }) async {
     final dir = path.substring(0, path.lastIndexOf('/'));
     final name = path.split('/').last;
     final dot = name.lastIndexOf('.');
     final base = dot > 0 ? name.substring(0, dot) : name;
-    final folder = await _files.uniquePath(dir, '$base images');
+    final folder = await _files.uniquePath(await OutputLocation.resolve(dir, OutputKind.images), '$base images');
     await Directory(folder).create(recursive: true);
 
     final doc = await open(path);
@@ -200,10 +201,11 @@ class PdfToolsService {
         final n = pages[i];
         final image = await renderImage(doc.pages[n - 1], dpi / 72);
         final Uint8List bytes = await Isolate.run(
-              () => jpg ? img.encodeJpg(image, quality: 90) : img.encodePng(image),
+          () => jpg ? img.encodeJpg(image, quality: 90) : img.encodePng(image),
         );
         final file = '$base page ${n.toString().padLeft(pad, '0')}.${jpg ? 'jpg' : 'png'}';
         await File('$folder/$file').writeAsBytes(bytes, flush: true);
+        OutputLocation.announce('$folder/$file');
         onProgress?.call(i + 1, pages.length);
       }
     } finally {
@@ -215,9 +217,9 @@ class PdfToolsService {
   /// Saves the text of the PDF next to it as a .txt file. Scanned PDFs (just
   /// pictures of pages) have no text to read.
   Future<({String path, int pages, int characters})> toText(
-      String path, {
-        void Function(int done, int total)? onProgress,
-      }) async {
+    String path, {
+    void Function(int done, int total)? onProgress,
+  }) async {
     final dir = path.substring(0, path.lastIndexOf('/'));
     final name = path.split('/').last;
     final dot = name.lastIndexOf('.');
@@ -246,7 +248,7 @@ class PdfToolsService {
     if (buffer.isEmpty) {
       throw const FormatException('No text found. This PDF may be scanned pictures');
     }
-    final outPath = await _files.uniquePath(dir, '$base.txt');
+    final outPath = await _files.uniquePath(await OutputLocation.resolve(dir, OutputKind.documents), '$base.txt');
     await File(outPath).writeAsString(buffer.toString(), flush: true);
     return (path: outPath, pages: pages, characters: buffer.length);
   }

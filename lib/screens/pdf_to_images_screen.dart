@@ -27,6 +27,7 @@ class _PdfToImagesScreenState extends State<PdfToImagesScreen> {
   bool _busy = false;
   String? _error;
   String? _saved;
+  String? _folder;
 
   static const _dpis = [72, 150, 200, 300];
 
@@ -60,7 +61,7 @@ class _PdfToImagesScreenState extends State<PdfToImagesScreen> {
       final folder = await runWithProgress(
         context,
         'Saving pictures…',
-            () => _service.toImages(
+        () => _service.toImages(
           widget.item.path,
           pages,
           jpg: _jpg,
@@ -72,8 +73,9 @@ class _PdfToImagesScreenState extends State<PdfToImagesScreen> {
       detail.dispose();
       if (!mounted) return;
       setState(() {
+        _folder = folder;
         _saved =
-        'Saved ${pages.length} ${pages.length == 1 ? 'picture' : 'pictures'} in the folder "${folder.split('/').last}"';
+            'Saved ${pages.length} ${pages.length == 1 ? 'picture' : 'pictures'} in the folder "${folder.split('/').last}"';
       });
     } catch (e) {
       if (!mounted) return;
@@ -171,12 +173,12 @@ class _PdfToImagesScreenState extends State<PdfToImagesScreen> {
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
           child: saved != null
-              ? const SavedActions()
+              ? SavedActions(folderPath: _folder)
               : FilledButton(
-            style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
-            onPressed: _busy || count == null ? null : _run,
-            child: Text(_busy ? 'Working…' : 'Save pictures'),
-          ),
+                  style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+                  onPressed: _busy || count == null ? null : _run,
+                  child: Text(_busy ? 'Working…' : 'Save pictures'),
+                ),
         ),
       ),
     );

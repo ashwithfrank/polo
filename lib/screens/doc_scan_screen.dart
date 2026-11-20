@@ -7,6 +7,7 @@ import 'package:google_mlkit_document_scanner/google_mlkit_document_scanner.dart
 import '../services/file_service.dart';
 import '../widgets/pdf_result.dart';
 import '../widgets/polo_message.dart';
+import '../services/output_location.dart';
 
 /// "file:///a/b.pdf" and "/a/b.pdf" both become "/a/b.pdf".
 String _toPath(String uri) => uri.startsWith('file:') ? Uri.parse(uri).toFilePath() : uri;
@@ -101,18 +102,19 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
 
     try {
       if (_asPdf && widget.pdfPath != null) {
-        final dir = '$root/Documents/Scans';
+        final dir = await OutputLocation.resolve('$root/Documents/Scans', OutputKind.scans, fromScratch: true);
         await Directory(dir).create(recursive: true);
         pdfOut = await files.uniquePath(dir, '$name.pdf');
         await File(widget.pdfPath!).copy(pdfOut);
       }
       if (_asPictures && widget.pages.isNotEmpty) {
-        final dir = '$root/Pictures/Scans';
+        final dir = await OutputLocation.resolve('$root/Pictures/Scans', OutputKind.scans, fromScratch: true);
         await Directory(dir).create(recursive: true);
         for (var i = 0; i < widget.pages.length; i++) {
           final suffix = widget.pages.length == 1 ? '' : ' - ${i + 1}';
           final out = await files.uniquePath(dir, '$name$suffix.jpg');
           await File(widget.pages[i]).copy(out);
+          OutputLocation.announce(out);
           pictures++;
         }
       }
@@ -171,7 +173,7 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
                         fit: BoxFit.cover,
                         cacheWidth: 500,
                         errorBuilder: (_, _, _) =>
-                        const Center(child: Icon(Icons.broken_image_outlined)),
+                            const Center(child: Icon(Icons.broken_image_outlined)),
                       ),
                     ),
                   ),
@@ -210,10 +212,10 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
           child: saved != null
               ? SavedActions(openPath: _savedPdf)
               : FilledButton(
-            style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
-            onPressed: canSave ? _save : null,
-            child: Text(_saving ? 'Saving…' : 'Save'),
-          ),
+                  style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+                  onPressed: canSave ? _save : null,
+                  child: Text(_saving ? 'Saving…' : 'Save'),
+                ),
         ),
       ),
     );

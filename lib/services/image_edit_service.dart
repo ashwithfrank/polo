@@ -8,6 +8,7 @@ import 'package:image/image.dart' as img;
 import '../models/file_item.dart';
 import 'convert_service.dart';
 import 'file_service.dart';
+import './output_location.dart';
 
 /// What to do to a picture. Turns are clockwise quarter turns. The crop is
 /// given as fractions (0 to 1) of the picture AFTER turning and flipping.
@@ -54,7 +55,7 @@ class EditImageService {
     final ext = item.extension == 'jpeg' ? 'jpg' : item.extension;
     final dot = item.name.lastIndexOf('.');
     final base = dot > 0 ? item.name.substring(0, dot) : item.name;
-    final outPath = await _files.uniquePath(item.parentPath, '${base}_edited.$ext');
+    final outPath = await _files.uniquePath(await OutputLocation.resolve(item.parentPath, OutputKind.images), '${base}_edited.$ext');
     final inPath = item.path;
 
     var bytes = await Isolate.run(() => _editSync(inPath, ext, plan));
@@ -73,6 +74,7 @@ class EditImageService {
     }
 
     await File(outPath).writeAsBytes(bytes, flush: true);
+    OutputLocation.announce(outPath);
     return ConvertResult(path: outPath, bytes: bytes.length);
   }
 }

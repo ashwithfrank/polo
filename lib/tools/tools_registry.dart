@@ -16,6 +16,7 @@ import '../screens/qr_scanner_screen.dart';
 import '../services/cleanup_service.dart';
 import 'tool.dart';
 import 'tool_actions.dart';
+import '../screens/media_convert_screen.dart';
 
 const _mb = 1024 * 1024;
 
@@ -149,6 +150,42 @@ final List<Tool> allTools = [
     run: runPdfToText,
   ),
   Tool(
+    id: 'video_compress',
+    title: 'Compress video',
+    subtitle: 'Make big videos smaller',
+    icon: Icons.compress,
+    category: ToolCategory.convert,
+    keywords: ['video', 'compress', 'shrink', 'smaller', 'size', 'mp4', 'resize', 'movie'],
+    run: (c) => runMedia(c, MediaJob.compressVideo),
+  ),
+  Tool(
+    id: 'video_to_audio',
+    title: 'Video to audio',
+    subtitle: 'Save the sound as M4A',
+    icon: Icons.audiotrack_outlined,
+    category: ToolCategory.convert,
+    keywords: ['video', 'audio', 'extract', 'sound', 'mp3', 'm4a', 'music', 'song'],
+    run: (c) => runMedia(c, MediaJob.videoToAudio),
+  ),
+  Tool(
+    id: 'audio_convert',
+    title: 'Convert audio',
+    subtitle: 'MP3, WAV, OGG and FLAC to M4A',
+    icon: Icons.music_note_outlined,
+    category: ToolCategory.convert,
+    keywords: ['audio', 'convert', 'mp3', 'wav', 'ogg', 'flac', 'm4a', 'aac', 'music'],
+    run: (c) => runMedia(c, MediaJob.toM4a),
+  ),
+  Tool(
+    id: 'pdf_ocr',
+    title: 'Scanned PDF to text',
+    subtitle: 'Read pages that are pictures',
+    icon: Icons.document_scanner_outlined,
+    category: ToolCategory.documents,
+    keywords: ['pdf', 'ocr', 'scan', 'scanned', 'text', 'read', 'hindi', 'devanagari'],
+    run: runPdfOcr,
+  ),
+  Tool(
     id: 'text_to_pdf',
     title: 'Text to PDF',
     subtitle: 'Text or Markdown',
@@ -237,7 +274,7 @@ final List<Tool> allTools = [
     category: ToolCategory.cleanup,
     keywords: ['large', 'big', 'biggest', 'space', 'storage', 'size', 'free', 'clean'],
     run: _open(
-          () => CleanupScreen(
+      () => CleanupScreen(
         title: 'Large files',
         intro: 'Tap files to select them, then move them to the trash.',
         loader: () async => [
@@ -264,7 +301,7 @@ final List<Tool> allTools = [
     category: ToolCategory.cleanup,
     keywords: ['old', 'unused', 'forgotten', 'months', 'years', 'clean', 'space'],
     run: _open(
-          () => CleanupScreen(
+      () => CleanupScreen(
         title: 'Old files',
         intro: 'Files you have not changed for a while (100 KB and bigger).',
         loader: () async => [
@@ -291,7 +328,7 @@ final List<Tool> allTools = [
     category: ToolCategory.cleanup,
     keywords: ['downloads', 'download', 'apk', 'installer', 'zip', 'clean', 'tidy', 'junk'],
     run: _open(
-          () => CleanupScreen(
+      () => CleanupScreen(
         title: 'Downloads cleaner',
         intro: 'Everything in your Download folder. Select what you no longer need.',
         loader: CleanupService.downloads,
@@ -302,7 +339,7 @@ final List<Tool> allTools = [
           CleanupFilter('ZIPs', (f) => f.kind == FileKind.archive),
           CleanupFilter(
             'Documents',
-                (f) => f.kind == FileKind.pdf || f.kind == FileKind.document,
+            (f) => f.kind == FileKind.pdf || f.kind == FileKind.document,
           ),
           CleanupFilter('Images', (f) => f.kind == FileKind.image),
           CleanupFilter('Videos', (f) => f.kind == FileKind.video),
@@ -351,7 +388,7 @@ final List<Tool> allTools = [
     category: ToolCategory.developer,
     keywords: ['json', 'pretty', 'minify', 'validate', 'format', 'beautify'],
     run: _open(
-          () => const TextToolScreen(
+      () => const TextToolScreen(
         title: 'JSON formatter',
         modes: [
           TextMode('Format', jsonFormat, hint: 'Paste JSON here'),
@@ -369,7 +406,7 @@ final List<Tool> allTools = [
     category: ToolCategory.developer,
     keywords: ['base64', 'url', 'hex', 'html', 'entity', 'encode', 'decode', 'escape'],
     run: _open(
-          () => const TextToolScreen(
+      () => const TextToolScreen(
         title: 'Encode and decode',
         modes: [
           TextMode('Base64 encode', base64EncodeText),
@@ -392,7 +429,7 @@ final List<Tool> allTools = [
     category: ToolCategory.developer,
     keywords: ['jwt', 'token', 'json web token', 'bearer', 'auth'],
     run: _open(
-          () => const TextToolScreen(
+      () => const TextToolScreen(
         title: 'JWT decoder',
         modes: [TextMode('Decode', jwtDecode, hint: 'Paste a JWT (xxxxx.yyyyy.zzzzz)')],
       ),
@@ -406,7 +443,7 @@ final List<Tool> allTools = [
     category: ToolCategory.developer,
     keywords: ['hash', 'md5', 'sha', 'sha1', 'sha256', 'sha512', 'checksum', 'text'],
     run: _open(
-          () => const TextToolScreen(
+      () => const TextToolScreen(
         title: 'Text hash',
         modes: [TextMode('All hashes', hashText, hint: 'Type or paste the text to hash')],
       ),
@@ -441,7 +478,7 @@ final List<Tool> allTools = [
       'unix', 'timestamp', 'epoch', 'date', 'convert', 'unit',
     ],
     run: _open(
-          () => const TextToolScreen(
+      () => const TextToolScreen(
         title: 'Number converters',
         modes: [
           TextMode('Number bases', numberBases, hint: 'e.g. 255, 0xFF or 0b1010'),

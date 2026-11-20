@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../models/file_item.dart';
 import '../models/storage_category.dart';
@@ -14,6 +13,8 @@ import '../widgets/file_tile.dart';
 import '../widgets/message_view.dart';
 import '../widgets/open_file.dart';
 import '../widgets/selection_bar.dart';
+import '../widgets/haptics.dart';
+import '../widgets/drag_select.dart';
 
 enum _Sort { date, size, name }
 
@@ -36,6 +37,7 @@ class CategoryScreen extends StatefulWidget {
 class _CategoryScreenState extends State<CategoryScreen> {
   _Sort _sort = _Sort.date;
   final Set<String> _selected = {};
+  final _scroll = ScrollController();
 
   bool get _selecting => _selected.isNotEmpty;
 
@@ -57,8 +59,14 @@ class _CategoryScreenState extends State<CategoryScreen> {
     return list;
   }
 
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
   void _toggle(FileItem item) {
-    HapticFeedback.selectionClick();
+    Haptics.select();
     setState(() {
       if (!_selected.remove(item.path)) _selected.add(item.path);
     });
@@ -230,12 +238,12 @@ class _CategoryScreenState extends State<CategoryScreen> {
       return c.loading
           ? const Center(child: CircularProgressIndicator())
           : MessageView(
-        icon: Icons.error_outline,
-        title: "Couldn't load your files",
-        body: c.error ?? 'Try again in a moment.',
-        actionLabel: 'Try again',
-        onAction: c.load,
-      );
+              icon: Icons.error_outline,
+              title: "Couldn't load your files",
+              body: c.error ?? 'Try again in a moment.',
+              actionLabel: 'Try again',
+              onAction: c.load,
+            );
     }
 
     if (files.isEmpty) {
@@ -248,9 +256,19 @@ class _CategoryScreenState extends State<CategoryScreen> {
 
     final totalBytes = files.fold<int>(0, (sum, f) => sum + f.size);
 
-    return RefreshIndicator(
+    return DragSelectArea(
+      order: [for (final f in files) f.path],
+      selected: _selected,
+      scroll: _scroll,
+      onChanged: (next) => setState(() {
+        _selected
+          ..clear()
+          ..addAll(next);
+      }),
+      child: RefreshIndicator(
       onRefresh: c.load,
       child: ListView.builder(
+        controller: _scroll,
         physics: const AlwaysScrollableScrollPhysics(),
         itemCount: files.length + 1,
         itemBuilder: (context, i) {
@@ -264,11 +282,10 @@ class _CategoryScreenState extends State<CategoryScreen> {
             );
           }
           final item = files[i - 1];
-          return FileTile(
+          return DragSelectItem(path: item.path, child: FileTile(
             item: item,
             subtitle: '${formatBytes(item.size)} · ${folderLabelFor(item.path)}',
             selected: _selected.contains(item.path),
-            onLongPress: () => _toggle(item),
             onTap: () async {
               if (_selecting) {
                 _toggle(item);
@@ -291,8 +308,9 @@ class _CategoryScreenState extends State<CategoryScreen> {
                 PopupMenuItem(value: 'delete', child: Text('Move to trash')),
               ],
             ),
-          );
+          ));
         },
+      ),
       ),
     );
   }

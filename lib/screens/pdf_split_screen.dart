@@ -9,6 +9,7 @@ import '../services/pdf_tools_service.dart';
 import '../widgets/pdf_page_preview.dart';
 import '../widgets/pdf_result.dart';
 import '../widgets/progress_dialog.dart';
+import '../services/output_location.dart';
 
 enum _SplitMode { extract, each, every }
 
@@ -68,7 +69,7 @@ class _PdfSplitScreenState extends State<PdfSplitScreen> {
   Future<Uint8List> _thumb(int page) {
     return _thumbs.putIfAbsent(
       page,
-          () => PdfToolsService.renderPng(_doc!.pages[page - 1], 0.4),
+      () => PdfToolsService.renderPng(_doc!.pages[page - 1], 0.4),
     );
   }
 
@@ -119,10 +120,10 @@ class _PdfSplitScreenState extends State<PdfSplitScreen> {
                         child: snap.hasError
                             ? const Icon(Icons.broken_image_outlined)
                             : const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              ),
                       );
                     }
                     return Image.memory(snap.data!, fit: BoxFit.contain);
@@ -163,7 +164,7 @@ class _PdfSplitScreenState extends State<PdfSplitScreen> {
           context,
           pages[i],
           'Page ${pages[i]}',
-              () => showPdfPagePreview(
+          () => showPdfPagePreview(
             context,
             doc: doc,
             pages: [for (final p in pages) PdfPageRef(p)],
@@ -178,7 +179,7 @@ class _PdfSplitScreenState extends State<PdfSplitScreen> {
           context,
           g.first,
           g.length == 1 ? 'File ${i + 1} · p${g.first}' : 'File ${i + 1} · p${g.first}-${g.last}',
-              () => showPdfPagePreview(
+          () => showPdfPagePreview(
             context,
             doc: doc,
             pages: [for (final p in g) PdfPageRef(p)],
@@ -242,7 +243,7 @@ class _PdfSplitScreenState extends State<PdfSplitScreen> {
           if (!mounted) return;
           setState(() {
             _savedText =
-            'Saved ${pages.length} ${pages.length == 1 ? 'page' : 'pages'} as ${out.split('/').last}';
+                'Saved ${pages.length} ${pages.length == 1 ? 'page' : 'pages'} as ${out.split('/').last}';
             _savedFile = out;
           });
         case _SplitMode.each:
@@ -258,7 +259,7 @@ class _PdfSplitScreenState extends State<PdfSplitScreen> {
           final folder = await runWithProgress(
             context,
             'Splitting…',
-                () => _service.splitToFolder(
+            () => _service.splitToFolder(
               item.path,
               groups,
               folderName: _mode == _SplitMode.each ? '$base pages' : '$base parts',
@@ -271,7 +272,7 @@ class _PdfSplitScreenState extends State<PdfSplitScreen> {
           if (!mounted) return;
           setState(() {
             _savedText =
-            'Saved ${groups.length} ${groups.length == 1 ? 'file' : 'files'} in the folder "${folder.split('/').last}"';
+                'Saved ${groups.length} ${groups.length == 1 ? 'file' : 'files'} in the folder "${folder.split('/').last}"';
             _savedFile = null;
           });
       }
@@ -357,7 +358,7 @@ class _PdfSplitScreenState extends State<PdfSplitScreen> {
               const SizedBox(height: 6),
               Text(
                 'Separate pages with commas. "8-" means page 8 to the end. '
-                    'The order you type is the order in the new PDF.',
+                'The order you type is the order in the new PDF.',
                 style: muted,
               ),
             ] else if (_mode == _SplitMode.every) ...[
@@ -372,7 +373,7 @@ class _PdfSplitScreenState extends State<PdfSplitScreen> {
               Text('The last file may have fewer pages.', style: muted),
             ] else
               Text(
-                'Every page becomes its own PDF, saved in a new folder next to the original.',
+                'Every page becomes its own PDF, saved in a new folder (${OutputLocation.hint('the original', OutputKind.documents).toLowerCase()}).',
                 style: muted,
               ),
             if (_error != null) ...[
@@ -389,10 +390,10 @@ class _PdfSplitScreenState extends State<PdfSplitScreen> {
           child: saved != null
               ? SavedActions(openPath: _savedFile)
               : FilledButton(
-            style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
-            onPressed: _busy || count == null ? null : _run,
-            child: Text(_busy ? 'Working…' : 'Go'),
-          ),
+                  style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+                  onPressed: _busy || count == null ? null : _run,
+                  child: Text(_busy ? 'Working…' : 'Go'),
+                ),
         ),
       ),
     );

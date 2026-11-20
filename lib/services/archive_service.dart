@@ -5,6 +5,7 @@ import 'package:archive/archive_io.dart';
 
 import '../models/file_item.dart';
 import 'file_service.dart';
+import './output_location.dart';
 
 class ExtractResult {
   const ExtractResult({required this.folderPath, required this.fileCount});
@@ -23,11 +24,11 @@ class ArchiveService {
   /// Compresses [items] (files and folders) into [fileName] inside [dir].
   /// Never overwrites: a taken name becomes "name (1).zip". Returns the path.
   Future<String> createZip(
-      List<FileItem> items,
-      String dir,
-      String fileName,
-      ) async {
-    final outPath = await _files.uniquePath(dir, fileName);
+    List<FileItem> items,
+    String dir,
+    String fileName,
+  ) async {
+    final outPath = await _files.uniquePath(await OutputLocation.resolve(dir, OutputKind.archives), fileName);
 
     for (final item in items) {
       if (item.isDirectory && outPath.startsWith('${item.path}/')) {

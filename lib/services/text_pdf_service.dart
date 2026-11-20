@@ -5,21 +5,22 @@ import 'package:pdf/pdf.dart' as pdfw;
 import 'package:pdf/widgets.dart' as pw;
 
 import 'file_service.dart';
+import './output_location.dart';
 
 enum TextPageSize { a4, a5, letter }
 
 extension TextPageSizeX on TextPageSize {
   String get label => switch (this) {
-    TextPageSize.a4 => 'A4',
-    TextPageSize.a5 => 'A5',
-    TextPageSize.letter => 'Letter',
-  };
+        TextPageSize.a4 => 'A4',
+        TextPageSize.a5 => 'A5',
+        TextPageSize.letter => 'Letter',
+      };
 
   pdfw.PdfPageFormat get format => switch (this) {
-    TextPageSize.a4 => pdfw.PdfPageFormat.a4,
-    TextPageSize.a5 => pdfw.PdfPageFormat.a5,
-    TextPageSize.letter => pdfw.PdfPageFormat.letter,
-  };
+        TextPageSize.a4 => pdfw.PdfPageFormat.a4,
+        TextPageSize.a5 => pdfw.PdfPageFormat.a5,
+        TextPageSize.letter => pdfw.PdfPageFormat.letter,
+      };
 }
 
 class TextPdfResult {
@@ -46,9 +47,9 @@ class TextPdfService {
     required String dir,
     required String fileName,
   }) async {
-    final outPath = await _files.uniquePath(dir, fileName);
+    final outPath = await _files.uniquePath(await OutputLocation.resolve(dir, OutputKind.documents), fileName);
     final skipped = await Isolate.run(
-          () => _build(text, markdown, size, landscape, fontSize, outPath),
+      () => _build(text, markdown, size, landscape, fontSize, outPath),
     );
     return TextPdfResult(path: outPath, skipped: skipped);
   }
@@ -89,13 +90,13 @@ class TextPdfService {
 }
 
 Future<int> _build(
-    String raw,
-    bool markdown,
-    TextPageSize size,
-    bool landscape,
-    double fontSize,
-    String outPath,
-    ) async {
+  String raw,
+  bool markdown,
+  TextPageSize size,
+  bool landscape,
+  double fontSize,
+  String outPath,
+) async {
   final (text, skipped) = _sanitize(raw);
   final doc = pw.Document();
   final base = size.format;
@@ -248,12 +249,12 @@ pw.Widget _codeBlock(List<String> lines, double size) {
 
 /// Bold, italic, `code` and [links](url) inside one line of text.
 pw.Widget _inline(
-    String text,
-    double size, {
-      bool bold = false,
-      bool italic = false,
-      pdfw.PdfColor? color,
-    }) {
+  String text,
+  double size, {
+  bool bold = false,
+  bool italic = false,
+  pdfw.PdfColor? color,
+}) {
   final pattern = RegExp(
     r'(\*\*[^*]+\*\*|__[^_]+__|\*[^*\s][^*]*\*|_[^_\s][^_]*_|`[^`]+`|\[[^\]]+\]\([^)]+\))',
   );

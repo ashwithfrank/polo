@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/file_service.dart';
+import '../services/output_location.dart';
 import '../services/settings_controller.dart';
 import '../theme/theme_controller.dart';
 import '../widgets/accent_picker.dart';
@@ -97,6 +98,64 @@ class SettingsScreen extends StatelessWidget {
                   selected: {settings.sortBy},
                   onSelectionChanged: (s) => settings.setSortBy(s.first),
                 ),
+              ),
+              const _Section('Saving results'),
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: Text('Where tools save what they make'),
+              ),
+              for (final o in const [
+                (OutputMode.smart, 'Smart (recommended)',
+                    'Edits stay next to the original. Scans, QR codes and other new things go to the Polo folder'),
+                (OutputMode.nextToOriginal, 'Next to the original',
+                    'Scans and QR codes still go to the Polo folder'),
+                (OutputMode.poloFolder, 'Always the Polo folder',
+                    'Polo/Images, Documents, Scans, QR codes, Archives'),
+              ])
+                ListTile(
+                  leading: Icon(
+                    settings.outputMode == o.$1
+                        ? Icons.radio_button_checked
+                        : Icons.radio_button_unchecked,
+                    color: settings.outputMode == o.$1
+                        ? Theme.of(context).colorScheme.primary
+                        : null,
+                  ),
+                  title: Text(o.$2),
+                  subtitle: Text(o.$3),
+                  onTap: () => settings.setOutputMode(o.$1),
+                ),
+              const _Section('Selecting files'),
+              SwitchListTile(
+                title: const Text('Slide to select'),
+                subtitle: const Text('Hold a file, then slide up or down to select more'),
+                value: settings.dragSelect,
+                onChanged: settings.setDragSelect,
+              ),
+              ListTile(
+                title: const Text('Hold time'),
+                subtitle: Text('${settings.longPressMs} ms. Shorter selects faster'),
+              ),
+              Slider(
+                min: 250,
+                max: 1000,
+                divisions: 15,
+                label: '${settings.longPressMs} ms',
+                value: settings.longPressMs.toDouble().clamp(250, 1000),
+                onChanged: (v) => settings.setLongPressMs(v.round()),
+              ),
+              const _Section('Feel'),
+              SwitchListTile(
+                title: const Text('Vibration'),
+                subtitle: const Text('A small buzz when you select or switch tabs'),
+                value: settings.haptics,
+                onChanged: settings.setHaptics,
+              ),
+              SwitchListTile(
+                title: const Text('Animations'),
+                subtitle: const Text('Fades, slides and press effects'),
+                value: settings.animations,
+                onChanged: settings.setAnimations,
               ),
               const _Section('Files'),
               ListTile(

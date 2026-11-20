@@ -16,11 +16,11 @@ class PdfPageRef {
 /// Shows [pages] of [doc] big, one at a time, with zoom and next/previous
 /// buttons. Starts at position [start] in [pages].
 Future<void> showPdfPagePreview(
-    BuildContext context, {
-      required pdfrx.PdfDocument doc,
-      required List<PdfPageRef> pages,
-      int start = 0,
-    }) {
+  BuildContext context, {
+  required pdfrx.PdfDocument doc,
+  required List<PdfPageRef> pages,
+  int start = 0,
+}) {
   return showDialog<void>(
     context: context,
     builder: (_) => _PreviewDialog(doc: doc, pages: pages, start: start),
@@ -45,7 +45,7 @@ class _PreviewDialogState extends State<_PreviewDialog> {
   Future<Uint8List> _image(int page) {
     return _images.putIfAbsent(
       page,
-          () => PdfToolsService.renderPng(widget.doc.pages[page - 1], 2.0),
+      () => PdfToolsService.renderPng(widget.doc.pages[page - 1], 2.0),
     );
   }
 
@@ -86,34 +86,38 @@ class _PreviewDialogState extends State<_PreviewDialog> {
                 ],
               ),
             ),
-            Flexible(
+            SizedBox(
+              height: MediaQuery.of(context).size.height * 0.58,
               child: Container(
                 width: double.infinity,
+                height: double.infinity,
                 color: scheme.surfaceContainerHighest,
                 child: FutureBuilder<Uint8List>(
                   key: ValueKey(ref.page),
                   future: _image(ref.page),
                   builder: (context, snap) {
                     if (snap.hasError) {
-                      return const SizedBox(
-                        height: 200,
-                        child: Center(child: Text("Couldn't draw this page")),
-                      );
+                      return const Center(child: Text("Couldn't draw this page"));
                     }
                     if (!snap.hasData) {
-                      return const SizedBox(
-                        height: 200,
-                        child: Center(child: CircularProgressIndicator()),
-                      );
+                      return const Center(child: CircularProgressIndicator());
                     }
                     return InteractiveViewer(
                       minScale: 1,
                       maxScale: 5,
-                      child: Padding(
-                        padding: const EdgeInsets.all(8),
-                        child: RotatedBox(
-                          quarterTurns: ref.turns % 4,
-                          child: Image.memory(snap.data!, fit: BoxFit.contain),
+                      child: SizedBox.expand(
+                        child: Padding(
+                          padding: const EdgeInsets.all(8),
+                          child: RotatedBox(
+                            quarterTurns: ref.turns % 4,
+                            child: Image.memory(
+                              snap.data!,
+                              width: double.infinity,
+                              height: double.infinity,
+                              fit: BoxFit.contain,
+                              alignment: Alignment.center,
+                            ),
+                          ),
                         ),
                       ),
                     );

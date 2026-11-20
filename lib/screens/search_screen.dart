@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../models/file_item.dart';
 import '../models/storage_category.dart';
@@ -16,6 +15,8 @@ import '../widgets/file_tile.dart';
 import '../widgets/message_view.dart';
 import '../widgets/open_file.dart';
 import '../widgets/selection_bar.dart';
+import '../widgets/haptics.dart';
+import '../widgets/drag_select.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({
@@ -42,10 +43,11 @@ class _SearchScreenState extends State<SearchScreen> {
   String _cachedKey = '';
 
   final Set<String> _selected = {};
+  final _scroll = ScrollController();
   bool get _selecting => _selected.isNotEmpty;
 
   void _toggle(FileItem item) {
-    HapticFeedback.selectionClick();
+    Haptics.select();
     setState(() {
       if (!_selected.remove(item.path)) _selected.add(item.path);
     });
@@ -79,8 +81,8 @@ class _SearchScreenState extends State<SearchScreen> {
     (label: 'Folders', test: (FileItem i) => i.isDirectory),
     for (final c in StorageCategory.values.where((c) => c != StorageCategory.other))
       (
-      label: c.label,
-      test: (FileItem i) => !i.isDirectory && StorageCategory.of(i.kind) == c,
+        label: c.label,
+        test: (FileItem i) => !i.isDirectory && StorageCategory.of(i.kind) == c,
       ),
   ];
 
@@ -88,6 +90,7 @@ class _SearchScreenState extends State<SearchScreen> {
   void dispose() {
     _debounce?.cancel();
     _text.dispose();
+    _scroll.dispose();
     super.dispose();
   }
 
@@ -316,54 +319,64 @@ class _SearchScreenState extends State<SearchScreen> {
         Expanded(
           child: results.isEmpty
               ? (_query.isEmpty
-              ? const MessageView(
-            icon: Icons.search,
-            title: 'Search your files',
-            body: 'Type a name to find files and folders.',
-          )
-              : MessageView(
-            icon: Icons.search_off,
-            title: 'No results',
-            body: 'Nothing matches "$_query".',
-          ))
-              : ListView.builder(
-            itemCount: results.length,
-            itemBuilder: (context, i) {
-              final item = results[i];
-              return FileTile(
-                item: item,
-                selected: _selected.contains(item.path),
-                onLongPress: () => _toggle(item),
-                subtitle: item.isDirectory
-                    ? folderLabelFor(item.path)
-                    : '${formatBytes(item.size)} · ${folderLabelFor(item.path)}',
-                onTap: () {
-                  if (_selecting) {
-                    _toggle(item);
-                  } else if (item.isDirectory) {
-                    widget.onOpenFolder(item.path);
-                  } else {
-                    openFile(context, item);
-                  }
-                },
-                trailing: item.isDirectory || _selecting
-                    ? null
-                    : PopupMenuButton<String>(
-                  onSelected: (v) async {
-                    if (v == 'folder') {
-                      widget.onOpenFolder(item.parentPath);
-                    } else if (await showQuickActions(context, item) && mounted) {
-                      _changed();
-                    }
+                  ? const MessageView(
+                      icon: Icons.search,
+                      title: 'Search your files',
+                      body: 'Type a name to find files and folders.',
+                    )
+                  : MessageView(
+                      icon: Icons.search_off,
+                      title: 'No results',
+                      body: 'Nothing matches "$_query".',
+                    ))
+              : DragSelectArea(
+                  order: [for (final r in results) r.path],
+                  selected: _selected,
+                  scroll: _scroll,
+                  onChanged: (next) => setState(() {
+                    _selected
+                      ..clear()
+                      ..addAll(next);
+                  }),
+                  child: ListView.builder(
+                  controller: _scroll,
+                  itemCount: results.length,
+                  itemBuilder: (context, i) {
+                    final item = results[i];
+                    return DragSelectItem(path: item.path, child: FileTile(
+                      item: item,
+                      selected: _selected.contains(item.path),
+                      subtitle: item.isDirectory
+                          ? folderLabelFor(item.path)
+                          : '${formatBytes(item.size)} · ${folderLabelFor(item.path)}',
+                      onTap: () {
+                        if (_selecting) {
+                          _toggle(item);
+                        } else if (item.isDirectory) {
+                          widget.onOpenFolder(item.path);
+                        } else {
+                          openFile(context, item);
+                        }
+                      },
+                      trailing: item.isDirectory || _selecting
+                          ? null
+                          : PopupMenuButton<String>(
+                              onSelected: (v) async {
+                                if (v == 'folder') {
+                                  widget.onOpenFolder(item.parentPath);
+                                } else if (await showQuickActions(context, item) && mounted) {
+                                  _changed();
+                                }
+                              },
+                              itemBuilder: (_) => const [
+                                PopupMenuItem(value: 'quick', child: Text('Quick actions')),
+                                PopupMenuItem(value: 'folder', child: Text('Show in folder')),
+                              ],
+                            ),
+                    ));
                   },
-                  itemBuilder: (_) => const [
-                    PopupMenuItem(value: 'quick', child: Text('Quick actions')),
-                    PopupMenuItem(value: 'folder', child: Text('Show in folder')),
-                  ],
                 ),
-              );
-            },
-          ),
+                ),
         ),
       ],
     );
