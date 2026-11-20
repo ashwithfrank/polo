@@ -1,8 +1,12 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:pdfrx/pdfrx.dart' as pdfrx;
 
 import '../models/file_item.dart';
 import '../services/file_service.dart';
 import '../services/pdf_tools_service.dart';
+import '../widgets/pdf_page_preview.dart';
 import '../widgets/pdf_result.dart';
 import '../widgets/progress_dialog.dart';
 
@@ -31,11 +35,21 @@ class _PdfSplitScreenState extends State<PdfSplitScreen> {
   String? _savedText;
   String? _savedFile;
 
+  pdfrx.PdfDocument? _doc;
+  final Map<int, Future<Uint8List>> _thumbs = {};
+
   @override
   void initState() {
     super.initState();
-    _service.pageCount(widget.item.path).then((n) {
-      if (mounted) setState(() => _count = n);
+    PdfToolsService.open(widget.item.path).then((doc) {
+      if (!mounted) {
+        doc.dispose();
+        return;
+      }
+      setState(() {
+        _doc = doc;
+        _count = doc.pages.length;
+      });
     }).catchError((Object e) {
       if (mounted) {
         setState(() => _loadError = e is FormatException ? e.message : "Couldn't open this PDF");
@@ -45,9 +59,163 @@ class _PdfSplitScreenState extends State<PdfSplitScreen> {
 
   @override
   void dispose() {
+    _doc?.dispose();
     _pages.dispose();
     _every.dispose();
     super.dispose();
+  }
+
+  Future<Uint8List> _thumb(int page) {
+    return _thumbs.putIfAbsent(
+      page,
+          () => PdfToolsService.renderPng(_doc!.pages[page - 1], 0.4),
+    );
+  }
+
+  /// The groups of pages that will become files, or null while the input
+  /// can't be read yet. In extract mode there is one group.
+  List<List<int>>? _groups() {
+    final count = _count;
+    if (count == null) return null;
+    try {
+      if (_mode == _SplitMode.extract) {
+        return [parsePageRanges(_pages.text, count)];
+      }
+      final n = _mode == _SplitMode.each ? 1 : int.tryParse(_every.text.trim()) ?? 0;
+      if (n < 1) return null;
+      return [
+        for (var start = 1; start <= count; start += n)
+          [for (var p = start; p < start + n && p <= count; p++) p],
+      ];
+    } on FormatException {
+      return null;
+    }
+  }
+
+  Widget _tile(BuildContext context, int page, String caption, VoidCallback onTap) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(right: 10),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: onTap,
+        child: SizedBox(
+          width: 84,
+          child: Column(
+            children: [
+              Container(
+                width: 84,
+                height: 112,
+                decoration: BoxDecoration(
+                  color: scheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: FutureBuilder<Uint8List>(
+                  future: _thumb(page),
+                  builder: (context, snap) {
+                    if (!snap.hasData) {
+                      return Center(
+                        child: snap.hasError
+                            ? const Icon(Icons.broken_image_outlined)
+                            : const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      );
+                    }
+                    return Image.memory(snap.data!, fit: BoxFit.contain);
+                  },
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                caption,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 11),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// A row of small pages showing what the result will contain. Tap one to
+  /// see it big.
+  Widget _resultPreview(BuildContext context) {
+    final groups = _groups();
+    final doc = _doc;
+    if (groups == null || doc == null || groups.isEmpty || groups.first.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    final scheme = Theme.of(context).colorScheme;
+    final extract = _mode == _SplitMode.extract;
+    const cap = 40;
+
+    final tiles = <Widget>[];
+    if (extract) {
+      final pages = groups.first;
+      for (var i = 0; i < pages.length && i < cap; i++) {
+        tiles.add(_tile(
+          context,
+          pages[i],
+          'Page ${pages[i]}',
+              () => showPdfPagePreview(
+            context,
+            doc: doc,
+            pages: [for (final p in pages) PdfPageRef(p)],
+            start: i,
+          ),
+        ));
+      }
+    } else {
+      for (var i = 0; i < groups.length && i < cap; i++) {
+        final g = groups[i];
+        tiles.add(_tile(
+          context,
+          g.first,
+          g.length == 1 ? 'File ${i + 1} · p${g.first}' : 'File ${i + 1} · p${g.first}-${g.last}',
+              () => showPdfPagePreview(
+            context,
+            doc: doc,
+            pages: [for (final p in g) PdfPageRef(p)],
+          ),
+        ));
+      }
+    }
+
+    final total = extract ? groups.first.length : groups.length;
+    final label = extract
+        ? '${groups.first.length} ${groups.first.length == 1 ? 'page' : 'pages'} in the new PDF'
+        : '$total ${total == 1 ? 'file' : 'files'} will be made';
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Result preview', style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: 2),
+          Text(
+            '$label. Tap one to view it.',
+            style: TextStyle(color: scheme.onSurface.withValues(alpha: 0.6), fontSize: 12),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 140,
+            child: ListView(scrollDirection: Axis.horizontal, children: tiles),
+          ),
+          if (total > cap)
+            Text(
+              'Showing the first $cap of $total',
+              style: TextStyle(color: scheme.onSurface.withValues(alpha: 0.6), fontSize: 12),
+            ),
+        ],
+      ),
+    );
   }
 
   Future<void> _run() async {
@@ -179,6 +347,7 @@ class _PdfSplitScreenState extends State<PdfSplitScreen> {
               TextField(
                 controller: _pages,
                 enabled: !locked,
+                onChanged: (_) => setState(() {}),
                 keyboardType: TextInputType.text,
                 decoration: const InputDecoration(
                   labelText: 'Pages',
@@ -195,6 +364,7 @@ class _PdfSplitScreenState extends State<PdfSplitScreen> {
               TextField(
                 controller: _every,
                 enabled: !locked,
+                onChanged: (_) => setState(() {}),
                 keyboardType: TextInputType.number,
                 decoration: const InputDecoration(labelText: 'Pages in each file'),
               ),
@@ -209,6 +379,7 @@ class _PdfSplitScreenState extends State<PdfSplitScreen> {
               const SizedBox(height: 12),
               Text(_error!, style: TextStyle(color: scheme.error)),
             ],
+            if (saved == null) _resultPreview(context),
           ],
         ],
       ),

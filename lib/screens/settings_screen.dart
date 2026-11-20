@@ -5,6 +5,7 @@ import '../services/settings_controller.dart';
 import '../theme/theme_controller.dart';
 import '../widgets/accent_picker.dart';
 import 'about_screen.dart';
+import 'customize_home_screen.dart';
 import 'trash_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -63,6 +64,16 @@ class SettingsScreen extends StatelessWidget {
                 child: Text('Accent colour'),
               ),
               AccentPicker(controller: themeController),
+              const _Section('Home'),
+              ListTile(
+                leading: const Icon(Icons.dashboard_customize_outlined),
+                title: const Text('Customize Home'),
+                subtitle: const Text('Hide or reorder blocks and pick quick access folders'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => CustomizeHomeScreen(settings: settings)),
+                ),
+              ),
               const _Section('Browsing'),
               SwitchListTile(
                 title: const Text('Show hidden files'),

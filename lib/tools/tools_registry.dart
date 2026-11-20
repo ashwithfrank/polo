@@ -181,6 +181,15 @@ final List<Tool> allTools = [
     run: runChecksum,
   ),
   Tool(
+    id: 'compare_files',
+    title: 'Compare files',
+    subtitle: 'Spot the differences',
+    icon: Icons.difference_outlined,
+    category: ToolCategory.organize,
+    keywords: ['compare', 'diff', 'difference', 'same', 'identical', 'duplicate', 'versions'],
+    run: runCompare,
+  ),
+  Tool(
     id: 'large_files',
     title: 'Large files',
     subtitle: 'Find what takes space',

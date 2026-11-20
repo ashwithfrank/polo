@@ -6,6 +6,7 @@ import 'package:pdfrx/pdfrx.dart' as pdfrx;
 import '../models/file_item.dart';
 import '../services/file_service.dart';
 import '../services/pdf_tools_service.dart';
+import '../widgets/pdf_page_preview.dart';
 import '../widgets/pdf_result.dart';
 
 /// Rotate, reorder and delete the pages of a PDF. The result is a new file.
@@ -135,7 +136,7 @@ class _PdfOrganizeScreenState extends State<PdfOrganizeScreen> {
             ],
             Text(
               '${_edits.length} of ${_doc!.pages.length} pages'
-                  '${locked ? '' : ' · drag to reorder, rotate or remove'}',
+                  '${locked ? '' : ' · tap a page to view it, drag to reorder'}',
               style: TextStyle(color: scheme.onSurface.withValues(alpha: 0.65), fontSize: 13),
             ),
             const SizedBox(height: 8),
@@ -159,29 +160,38 @@ class _PdfOrganizeScreenState extends State<PdfOrganizeScreen> {
             ),
             child: Row(
               children: [
-                SizedBox(
-                  width: 72,
-                  height: 96,
-                  child: FutureBuilder<Uint8List>(
-                    future: _thumb(e.index),
-                    builder: (context, snap) {
-                      if (!snap.hasData) {
-                        return Center(
-                          child: snap.hasError
-                              ? const Icon(Icons.broken_image_outlined)
-                              : const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ),
+                InkWell(
+                  borderRadius: BorderRadius.circular(8),
+                  onTap: () => showPdfPagePreview(
+                    context,
+                    doc: _doc!,
+                    pages: [for (final x in _edits) PdfPageRef(x.index + 1, turns: x.turns)],
+                    start: i,
+                  ),
+                  child: SizedBox(
+                    width: 72,
+                    height: 96,
+                    child: FutureBuilder<Uint8List>(
+                      future: _thumb(e.index),
+                      builder: (context, snap) {
+                        if (!snap.hasData) {
+                          return Center(
+                            child: snap.hasError
+                                ? const Icon(Icons.broken_image_outlined)
+                                : const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          );
+                        }
+                        return AnimatedRotation(
+                          turns: e.turns / 4,
+                          duration: const Duration(milliseconds: 200),
+                          child: Image.memory(snap.data!, fit: BoxFit.contain),
                         );
-                      }
-                      return AnimatedRotation(
-                        turns: e.turns / 4,
-                        duration: const Duration(milliseconds: 200),
-                        child: Image.memory(snap.data!, fit: BoxFit.contain),
-                      );
-                    },
+                      },
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),

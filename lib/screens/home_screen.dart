@@ -1,19 +1,24 @@
 import 'package:flutter/material.dart';
 
+import '../models/home_layout.dart';
 import '../models/storage_category.dart';
 import '../services/file_service.dart';
+import '../services/settings_controller.dart';
 import '../services/storage_controller.dart';
 import '../services/storage_info.dart';
+import '../services/storage_scanner.dart';
 import '../utils/format.dart';
 import '../widgets/file_tile.dart';
 import '../widgets/message_view.dart';
 import '../widgets/motion.dart';
 import '../widgets/open_file.dart';
+import 'customize_home_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({
     super.key,
     required this.controller,
+    required this.settings,
     required this.onOpenFolder,
     required this.onOpenStorage,
     required this.onSearch,
@@ -22,6 +27,7 @@ class HomeScreen extends StatelessWidget {
   });
 
   final StorageController controller;
+  final SettingsController settings;
   final void Function(String path) onOpenFolder;
   final VoidCallback onOpenStorage;
   final VoidCallback onSearch;
@@ -31,7 +37,7 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: controller,
+      listenable: Listenable.merge([controller, settings]),
       builder: (context, _) {
         if (controller.needsAccess) {
           return MessageView(
@@ -46,121 +52,180 @@ class HomeScreen extends StatelessWidget {
         final scan = controller.scan;
         final titleStyle = Theme.of(context).textTheme.titleSmall;
 
+        final children = <Widget>[
+          Reveal(index: 0, child: _SearchPill(onTap: onSearch)),
+          const SizedBox(height: 16),
+        ];
+        var step = 1;
+        for (final id in settings.homeOrder) {
+          if (settings.isHomeHidden(id)) continue;
+          final section = switch (id) {
+            'storage' => Reveal(
+              index: step,
+              child: _StorageCard(
+                info: controller.info,
+                loading: controller.loading,
+                onTap: onOpenStorage,
+              ),
+            ),
+            'vault' => Reveal(index: step, child: _VaultCard(onTap: onOpenVault)),
+            'categories' => _categories(context, step, titleStyle),
+            'quick' => _quick(context, step, titleStyle),
+            'recent' => _recent(context, step, titleStyle, scan),
+            _ => const SizedBox.shrink(),
+          };
+          children.add(KeyedSubtree(key: ValueKey(id), child: section));
+          children.add(SizedBox(height: id == 'storage' ? 12 : 24));
+          step++;
+        }
+        children.add(
+          Align(
+            alignment: Alignment.center,
+            child: TextButton.icon(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => CustomizeHomeScreen(settings: settings)),
+              ),
+              icon: const Icon(Icons.tune, size: 18),
+              label: const Text('Customize Home'),
+            ),
+          ),
+        );
+
         return RefreshIndicator(
           onRefresh: controller.load,
           child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-            children: [
-              Reveal(index: 0, child: _SearchPill(onTap: onSearch)),
-              const SizedBox(height: 16),
-              Reveal(
-                index: 1,
-                child: _StorageCard(
-                  info: controller.info,
-                  loading: controller.loading,
-                  onTap: onOpenStorage,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Reveal(index: 2, child: _VaultCard(onTap: onOpenVault)),
-              const SizedBox(height: 24),
-              Reveal(index: 2, child: Text('Categories', style: titleStyle)),
-              const SizedBox(height: 10),
-              Reveal(
-                index: 2,
-                child: SizedBox(
-                  height: 40,
-                  child: ListView(
-                    scrollDirection: Axis.horizontal,
-                    children: [
-                      for (final c in StorageCategory.values
-                          .where((c) => c != StorageCategory.other))
-                        Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: ActionChip(
-                            avatar: Icon(c.icon, size: 18, color: c.color),
-                            label: Text(c.label),
-                            onPressed: () => onOpenCategory(c),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-              Reveal(index: 3, child: Text('Quick access', style: titleStyle)),
-              const SizedBox(height: 10),
-              GridView.count(
-                crossAxisCount: 3,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                mainAxisSpacing: 10,
-                crossAxisSpacing: 10,
-                childAspectRatio: 1.1,
-                children: [
-                  for (var qi = 0; qi < _quickAccess.length; qi++)
-                    Reveal(
-                      index: 3 + qi ~/ 3,
-                      child: PressScale(
-                        child: _QuickTile(
-                          label: _quickAccess[qi].label,
-                          icon: _quickAccess[qi].icon,
-                          color: _quickAccess[qi].color,
-                          onTap: () => onOpenFolder(
-                            '${FileService.rootPath}/${_quickAccess[qi].folder}',
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 24),
-              Text('Recent files', style: titleStyle),
-              const SizedBox(height: 4),
-              if (scan == null && controller.loading)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 24),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                      SizedBox(width: 12),
-                      Text('Looking through your files…'),
-                    ],
-                  ),
-                )
-              else if (scan == null || scan.recent.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 24),
-                  child: Center(child: Text('No recent files yet.')),
-                )
-              else
-                for (final (n, item) in scan.recent.take(8).indexed)
-                  Reveal(
-                    index: 5 + n,
-                    child: FileTile(item: item, onTap: () => openFile(context, item)),
-                  ),
-            ],
+            children: children,
           ),
         );
       },
     );
   }
-}
 
-final _quickAccess = <({String label, IconData icon, String folder, Color color})>[
-  (label: 'Downloads', icon: Icons.download_outlined, folder: 'Download', color: Colors.green),
-  (label: 'Camera', icon: Icons.photo_camera_outlined, folder: 'DCIM/Camera', color: Colors.pink),
-  (label: 'Pictures', icon: Icons.image_outlined, folder: 'Pictures', color: Colors.orange),
-  (label: 'Documents', icon: Icons.description_outlined, folder: 'Documents', color: Colors.blue),
-  (label: 'Music', icon: Icons.music_note_outlined, folder: 'Music', color: Colors.teal),
-  (label: 'Movies', icon: Icons.movie_outlined, folder: 'Movies', color: Colors.deepPurple),
-];
+  Widget _categories(BuildContext context, int step, TextStyle? titleStyle) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Reveal(index: step, child: Text('Categories', style: titleStyle)),
+        const SizedBox(height: 10),
+        Reveal(
+          index: step,
+          child: SizedBox(
+            height: 40,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              children: [
+                for (final c in StorageCategory.values.where((c) => c != StorageCategory.other))
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: ActionChip(
+                      avatar: Icon(c.icon, size: 18, color: c.color),
+                      label: Text(c.label),
+                      onPressed: () => onOpenCategory(c),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _quick(BuildContext context, int step, TextStyle? titleStyle) {
+    final scheme = Theme.of(context).colorScheme;
+    // Presets keep their usual order; folders the user added follow.
+    final saved = settings.quickFolders;
+    final paths = [
+      for (final p in quickPresets)
+        if (saved.contains(p.path)) p.path,
+      ...saved.where((f) => !isPresetFolder(f)),
+    ];
+    if (paths.isEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Quick access', style: titleStyle),
+          const SizedBox(height: 8),
+          Text(
+            'No folders yet. Tap Customize Home to add some.',
+            style: TextStyle(color: scheme.onSurface.withValues(alpha: 0.6)),
+          ),
+        ],
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Reveal(index: step, child: Text('Quick access', style: titleStyle)),
+        const SizedBox(height: 10),
+        GridView.count(
+          crossAxisCount: 3,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          mainAxisSpacing: 10,
+          crossAxisSpacing: 10,
+          childAspectRatio: 1.1,
+          children: [
+            for (var qi = 0; qi < paths.length; qi++)
+              Reveal(
+                index: step + qi ~/ 3,
+                child: PressScale(
+                  child: Builder(builder: (context) {
+                    final f = quickFolderFor(paths[qi], scheme.primary);
+                    return _QuickTile(
+                      label: f.label,
+                      icon: f.icon,
+                      color: f.color,
+                      onTap: () => onOpenFolder('${FileService.rootPath}/${f.path}'),
+                    );
+                  }),
+                ),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _recent(BuildContext context, int step, TextStyle? titleStyle, ScanResult? scan) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Recent files', style: titleStyle),
+        const SizedBox(height: 4),
+        if (scan == null && controller.loading)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 24),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+                SizedBox(width: 12),
+                Text('Looking through your files…'),
+              ],
+            ),
+          )
+        else if (scan == null || scan.recent.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 24),
+            child: Center(child: Text('No recent files yet.')),
+          )
+        else
+          for (final (n, item) in scan.recent.take(8).indexed)
+            Reveal(
+              index: step + n,
+              child: FileTile(item: item, onTap: () => openFile(context, item)),
+            ),
+      ],
+    );
+  }
+}
 
 class _SearchPill extends StatelessWidget {
   const _SearchPill({required this.onTap});

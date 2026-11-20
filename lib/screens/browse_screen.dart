@@ -10,6 +10,7 @@ import '../models/file_item.dart';
 import '../services/archive_service.dart';
 import 'batch_rename_screen.dart';
 import 'checksum_screen.dart';
+import 'compare_screen.dart';
 import '../services/convert_service.dart';
 import '../services/settings_controller.dart';
 import '../services/file_service.dart';
@@ -23,6 +24,7 @@ import '../widgets/progress_dialog.dart';
 import 'convert_images_screen.dart';
 import 'images_to_pdf_screen.dart';
 import '../widgets/polo_message.dart';
+import '../widgets/quick_actions.dart';
 
 class BrowseScreen extends StatefulWidget {
   const BrowseScreen({
@@ -300,9 +302,21 @@ class _BrowseScreenState extends State<BrowseScreen> with WidgetsBindingObserver
     );
   }
 
+  /// The Quick Actions sheet for one file or folder.
+  Future<void> _quick(FileItem item) async {
+    final changed = await showQuickActions(context, item);
+    if (!mounted) return;
+    setState(_selected.clear);
+    if (changed) await _load(_path, showSpinner: false);
+  }
+
   Future<void> _more() async {
     final items = _selectedItems;
     if (items.isEmpty) return;
+    if (items.length == 1) {
+      await _quick(items.first);
+      return;
+    }
     final single = items.length == 1;
     final allImages = items.every(ConvertService.canConvert);
     final isZip = single && !items.first.isDirectory && items.first.extension == 'zip';
@@ -337,6 +351,12 @@ class _BrowseScreenState extends State<BrowseScreen> with WidgetsBindingObserver
                 leading: const Icon(Icons.verified_outlined),
                 title: const Text('Checksum'),
                 onTap: () => Navigator.pop(context, 'checksum'),
+              ),
+            if (items.length == 2 && items.every((f) => !f.isDirectory))
+              ListTile(
+                leading: const Icon(Icons.difference_outlined),
+                title: const Text('Compare the two files'),
+                onTap: () => Navigator.pop(context, 'compare'),
               ),
             ListTile(
               leading: const Icon(Icons.folder_zip_outlined),
@@ -385,6 +405,10 @@ class _BrowseScreenState extends State<BrowseScreen> with WidgetsBindingObserver
           setState(_selected.clear);
           await _load(_path, showSpinner: false);
         }
+      case 'compare':
+        await Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => CompareScreen(a: items[0], b: items[1])),
+        );
       case 'checksum':
         await Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => ChecksumScreen(file: items.first)),
@@ -838,6 +862,7 @@ class _BrowseScreenState extends State<BrowseScreen> with WidgetsBindingObserver
             selected: _selected.contains(item.path),
             onTap: () => _onTap(item),
             onLongPress: () => _toggle(item),
+            onMore: _selecting ? null : () => _quick(item),
           );
         },
       )
@@ -851,6 +876,7 @@ class _BrowseScreenState extends State<BrowseScreen> with WidgetsBindingObserver
             selected: _selected.contains(item.path),
             onTap: () => _onTap(item),
             onLongPress: () => _toggle(item),
+            onMore: _selecting ? null : () => _quick(item),
           );
         },
       ),

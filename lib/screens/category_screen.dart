@@ -8,6 +8,7 @@ import '../services/storage_scanner.dart';
 import '../utils/format.dart';
 import '../utils/paths.dart';
 import '../widgets/file_actions.dart';
+import '../widgets/quick_actions.dart';
 import '../widgets/file_details.dart';
 import '../widgets/file_tile.dart';
 import '../widgets/message_view.dart';
@@ -84,6 +85,8 @@ class _CategoryScreenState extends State<CategoryScreen> {
 
   Future<void> _onAction(String action, FileItem item) async {
     switch (action) {
+      case 'quick':
+        if (await showQuickActions(context, item) && mounted) _changed();
       case 'folder':
         widget.onShowInFolder(item.parentPath);
       case 'details':
@@ -281,6 +284,7 @@ class _CategoryScreenState extends State<CategoryScreen> {
                 : PopupMenuButton<String>(
               onSelected: (v) => _onAction(v, item),
               itemBuilder: (_) => const [
+                PopupMenuItem(value: 'quick', child: Text('Quick actions')),
                 PopupMenuItem(value: 'folder', child: Text('Show in folder')),
                 PopupMenuItem(value: 'share', child: Text('Share')),
                 PopupMenuItem(value: 'details', child: Text('Details')),

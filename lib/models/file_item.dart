@@ -49,11 +49,14 @@ class FileItem {
     return '${value.toStringAsFixed(value >= 100 ? 0 : 1)} ${units[i]}';
   }
 
-  String get dateLabel {
+  String get dateLabel => dateLabelFor(modified);
+
+  /// "5 Nov 2026" for any date.
+  String dateLabelFor(DateTime d) {
     const months = [
       'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
     ];
-    return '${modified.day} ${months[modified.month - 1]} ${modified.year}';
+    return '${d.day} ${months[d.month - 1]} ${d.year}';
   }
 }

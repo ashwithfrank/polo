@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../models/file_item.dart';
 import '../screens/apk_analyzer_screen.dart';
+import '../screens/compare_screen.dart';
 import '../screens/batch_rename_screen.dart';
 import '../screens/checksum_screen.dart';
 import '../screens/convert_images_screen.dart';
@@ -346,7 +347,12 @@ Future<void> runPdfToImages(BuildContext context) async {
 Future<void> runPdfToText(BuildContext context) async {
   final picked = await _pickPdfs(context, title: 'Choose a PDF', single: true);
   if (picked == null || picked.isEmpty || !context.mounted) return;
+  await pdfToText(context, picked.first);
+}
 
+/// Saves the text of [item] next to it. Used by the tool and Quick Actions.
+Future<void> pdfToText(BuildContext context, FileItem item) async {
+  final picked = [item];
   final detail = ValueNotifier<String>('');
   try {
     final result = await runWithProgress(
@@ -434,7 +440,12 @@ Future<void> runTextToPdf(BuildContext context) async {
   );
   if (picked == null || picked.isEmpty || !context.mounted) return;
 
-  final item = picked.first;
+  if (!context.mounted) return;
+  await textFileToPdf(context, picked.first);
+}
+
+/// Opens the text-to-PDF screen filled with the text of [item].
+Future<void> textFileToPdf(BuildContext context, FileItem item) async {
   if (item.size > 2 * 1024 * 1024) {
     showPoloMessage(context, 'That file is too big (2 MB is the limit)');
     return;
@@ -469,5 +480,27 @@ Future<void> runApkAnalyzer(BuildContext context) async {
 
   await Navigator.of(context).push(
     MaterialPageRoute(builder: (_) => ApkAnalyzerScreen(item: picked.first)),
+  );
+}
+
+Future<void> runCompare(BuildContext context) async {
+  List<FileItem>? picked;
+  while (true) {
+    picked = await Navigator.of(context).push<List<FileItem>>(
+      MaterialPageRoute(
+        builder: (_) => const PickFilesScreen(
+          title: 'Choose two files to compare',
+          accepts: _acceptAll,
+        ),
+      ),
+    );
+    if (picked == null || !context.mounted) return;
+    if (picked.length == 2) break;
+    showPoloMessage(context, 'Pick exactly two files');
+  }
+
+  final two = picked;
+  await Navigator.of(context).push(
+    MaterialPageRoute(builder: (_) => CompareScreen(a: two[0], b: two[1])),
   );
 }

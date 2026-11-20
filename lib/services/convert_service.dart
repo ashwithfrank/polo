@@ -56,6 +56,30 @@ class ConvertService {
   static bool isAlready(FileItem item, ImageTarget target) =>
       ImageTargetX.fromExtension(item.extension) == target;
 
+  /// The picture [item] would become, as bytes, without saving anything.
+  /// Used by the preview and by [convertImage].
+  Future<Uint8List> encode(FileItem item, ImageTarget out, int quality, int? maxSide) async {
+    final inPath = item.path;
+
+    // Decoding, resizing and encoding are heavy, so run them off the UI thread.
+    var bytes = await Isolate.run(() => _processSync(inPath, out, quality, maxSide));
+
+    if (out == ImageTarget.webp) {
+      // The image package can't write WebP, so Android's own encoder does it.
+      bytes = await FlutterImageCompress.compressWithList(
+        bytes,
+        format: CompressFormat.webp,
+        quality: quality,
+        // The defaults shrink big images; these values keep the size as is.
+        minWidth: 100000,
+        minHeight: 100000,
+        autoCorrectionAngle: false,
+        keepExif: false,
+      );
+    }
+    return bytes;
+  }
+
   /// Converts and/or shrinks [item] and saves the result next to it, never
   /// overwriting an existing file.
   ///
@@ -78,24 +102,7 @@ class ConvertService {
       dir,
       '${sameFormat ? '${base}_small' : base}.${out.ext}',
     );
-    final inPath = item.path;
-
-    // Decoding, resizing and encoding are heavy, so run them off the UI thread.
-    var bytes = await Isolate.run(() => _processSync(inPath, out, quality, maxSide));
-
-    if (out == ImageTarget.webp) {
-      // The image package can't write WebP, so Android's own encoder does it.
-      bytes = await FlutterImageCompress.compressWithList(
-        bytes,
-        format: CompressFormat.webp,
-        quality: quality,
-        // The defaults shrink big images; these values keep the size as is.
-        minWidth: 100000,
-        minHeight: 100000,
-        autoCorrectionAngle: false,
-        keepExif: false,
-      );
-    }
+    final bytes = await encode(item, out, quality, maxSide);
 
     await File(outPath).writeAsBytes(bytes, flush: true);
     return ConvertResult(path: outPath, bytes: bytes.length);

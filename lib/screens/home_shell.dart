@@ -252,6 +252,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
               active: _index == 0,
               child: HomeScreen(
                 controller: _storage,
+                settings: widget.settings,
                 onOpenFolder: _openFolder,
                 onOpenStorage: () => _select(3),
                 onSearch: _openSearch,

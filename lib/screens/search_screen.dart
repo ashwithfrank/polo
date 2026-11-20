@@ -10,6 +10,7 @@ import '../services/storage_scanner.dart';
 import '../utils/format.dart';
 import '../utils/paths.dart';
 import '../widgets/file_actions.dart';
+import '../widgets/quick_actions.dart';
 import '../widgets/file_details.dart';
 import '../widgets/file_tile.dart';
 import '../widgets/message_view.dart';
@@ -347,10 +348,18 @@ class _SearchScreenState extends State<SearchScreen> {
                 },
                 trailing: item.isDirectory || _selecting
                     ? null
-                    : IconButton(
-                  tooltip: 'Show in folder',
-                  icon: const Icon(Icons.folder_open_outlined),
-                  onPressed: () => widget.onOpenFolder(item.parentPath),
+                    : PopupMenuButton<String>(
+                  onSelected: (v) async {
+                    if (v == 'folder') {
+                      widget.onOpenFolder(item.parentPath);
+                    } else if (await showQuickActions(context, item) && mounted) {
+                      _changed();
+                    }
+                  },
+                  itemBuilder: (_) => const [
+                    PopupMenuItem(value: 'quick', child: Text('Quick actions')),
+                    PopupMenuItem(value: 'folder', child: Text('Show in folder')),
+                  ],
                 ),
               );
             },

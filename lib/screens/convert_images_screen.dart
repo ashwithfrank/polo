@@ -1,9 +1,14 @@
+import 'dart:async';
+import 'dart:io';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../models/file_item.dart';
 import '../services/convert_service.dart';
 import '../services/file_service.dart';
+import '../services/inspect_service.dart';
 import '../utils/format.dart';
 
 enum _Status { waiting, working, done, failed, skipped }
@@ -47,6 +52,199 @@ class _ConvertImagesScreenState extends State<ConvertImagesScreen> {
   bool _running = false;
   bool _finished = false;
 
+  // The live before/after preview of the first picture.
+  Uint8List? _previewBytes;
+  (int, int)? _previewSize;
+  (int, int)? _originalSize;
+  bool _previewing = false;
+  bool _previewSkipped = false;
+  Timer? _previewTimer;
+  int _previewToken = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    InspectService.imageSize(_jobs.first.item.path).then((size) {
+      if (mounted) setState(() => _originalSize = size);
+    });
+    _schedulePreview();
+  }
+
+  @override
+  void dispose() {
+    _previewTimer?.cancel();
+    super.dispose();
+  }
+
+  /// Rebuilds the preview shortly after the last change, so dragging the
+  /// slider doesn't start a job at every step.
+  void _schedulePreview() {
+    _previewTimer?.cancel();
+    final token = ++_previewToken;
+    final item = _jobs.first.item;
+
+    if (!widget.keepFormat && _maxSide == null && ConvertService.isAlready(item, _target)) {
+      setState(() {
+        _previewSkipped = true;
+        _previewing = false;
+        _previewBytes = null;
+      });
+      return;
+    }
+    setState(() {
+      _previewSkipped = false;
+      _previewing = true;
+    });
+
+    _previewTimer = Timer(const Duration(milliseconds: 450), () async {
+      Uint8List? bytes;
+      (int, int)? size;
+      try {
+        bytes = await _service.encode(
+          item,
+          widget.keepFormat
+              ? (ImageTargetX.fromExtension(item.extension) ?? ImageTarget.png)
+              : _target,
+          _quality.round(),
+          _maxSide,
+        );
+        size = await InspectService.imageSizeOfBytes(bytes);
+      } catch (_) {
+        bytes = null;
+      }
+      // A newer change already started another preview.
+      if (!mounted || token != _previewToken) return;
+      setState(() {
+        _previewBytes = bytes;
+        _previewSize = size;
+        _previewing = false;
+      });
+    });
+  }
+
+  Widget _panel(BuildContext context, String title, Widget picture, String detail, {Color? detailColor}) {
+    final scheme = Theme.of(context).colorScheme;
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: scheme.primary),
+          ),
+          const SizedBox(height: 6),
+          AspectRatio(
+            aspectRatio: 1,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: ColoredBox(color: scheme.surfaceContainerHighest, child: picture),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(detail, style: TextStyle(fontSize: 12, color: detailColor)),
+        ],
+      ),
+    );
+  }
+
+  Widget _previewCard(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final item = _jobs.first.item;
+    final before = item.size;
+    final bytes = _previewBytes;
+
+    String dims((int, int)? s) => s == null ? '' : '${s.$1} × ${s.$2}';
+
+    String resultDetail;
+    Color? color;
+    if (_previewSkipped) {
+      resultDetail = 'Already a ${_target.label}. Pick a size or another format.';
+    } else if (bytes == null) {
+      resultDetail = _previewing ? 'Working it out…' : 'No preview available';
+    } else {
+      final change = ((bytes.length - before) / before * 100).round();
+      final label = change == 0
+          ? 'same size'
+          : change < 0
+          ? '${-change}% smaller'
+          : '$change% bigger';
+      resultDetail = '${formatBytes(bytes.length)} · $label\n${dims(_previewSize)}';
+      color = change <= 0 ? Colors.green : scheme.error;
+    }
+
+    final Widget result = bytes == null
+        ? Center(
+      child: _previewing
+          ? const CircularProgressIndicator(strokeWidth: 3)
+          : Icon(Icons.image_not_supported_outlined, color: scheme.onSurface.withValues(alpha: 0.5)),
+    )
+        : Stack(
+      fit: StackFit.expand,
+      children: [
+        Image.memory(
+          bytes,
+          fit: BoxFit.contain,
+          cacheWidth: 700,
+          gaplessPlayback: true,
+          errorBuilder: (_, _, _) => Center(
+            child: Text(
+              'Preview not available\nfor ${_target.label}',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 12),
+            ),
+          ),
+        ),
+        if (_previewing)
+          const Align(
+            alignment: Alignment.topRight,
+            child: Padding(
+              padding: EdgeInsets.all(8),
+              child: SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2.5),
+              ),
+            ),
+          ),
+      ],
+    );
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _panel(
+                context,
+                'BEFORE',
+                Image.file(
+                  File(item.path),
+                  fit: BoxFit.contain,
+                  cacheWidth: 700,
+                  errorBuilder: (_, _, _) => const Center(child: Icon(Icons.broken_image_outlined)),
+                ),
+                '${formatBytes(before)}\n${dims(_originalSize)}',
+              ),
+              const SizedBox(width: 12),
+              _panel(context, 'AFTER', result, resultDetail, detailColor: color),
+            ],
+          ),
+          if (_jobs.length > 1)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                'Preview of ${item.name}. The other ${_jobs.length - 1} get the same settings.',
+                style: TextStyle(fontSize: 12, color: scheme.onSurface.withValues(alpha: 0.6)),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   int get _doneCount => _jobs.where((j) => j.status == _Status.done).length;
 
   static const _sizes = <int?>[null, 2560, 1920, 1600, 1280, 1024, 800];
@@ -70,6 +268,7 @@ class _ConvertImagesScreenState extends State<ConvertImagesScreen> {
         j.detail = null;
       }
     });
+    _schedulePreview();
   }
 
   Future<void> _run() async {
@@ -140,6 +339,7 @@ class _ConvertImagesScreenState extends State<ConvertImagesScreen> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
         children: [
+          _previewCard(context),
           if (!widget.keepFormat) ...[
             Text('Convert to', style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 8),

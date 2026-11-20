@@ -14,12 +14,16 @@ class FileGridTile extends StatelessWidget {
     required this.onTap,
     this.onLongPress,
     this.selected = false,
+    this.onMore,
   });
 
   final FileItem item;
   final VoidCallback onTap;
   final VoidCallback? onLongPress;
   final bool selected;
+
+  /// Shows a small ⋮ button that opens Quick Actions.
+  final VoidCallback? onMore;
 
   @override
   Widget build(BuildContext context) {
@@ -61,6 +65,23 @@ class FileGridTile extends StatelessWidget {
                       color: scheme.primary.withValues(alpha: 0.25),
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(color: scheme.primary, width: 2),
+                    ),
+                  ),
+                if (onMore != null)
+                  Positioned(
+                    top: 4,
+                    right: 4,
+                    child: Material(
+                      color: Colors.black45,
+                      shape: const CircleBorder(),
+                      child: InkWell(
+                        customBorder: const CircleBorder(),
+                        onTap: onMore,
+                        child: const Padding(
+                          padding: EdgeInsets.all(4),
+                          child: Icon(Icons.more_vert, size: 18, color: Colors.white),
+                        ),
+                      ),
                     ),
                   ),
                 if (selected)

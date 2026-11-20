@@ -13,6 +13,7 @@ class FileTile extends StatelessWidget {
     this.selected = false,
     this.trailing,
     this.subtitle,
+    this.onMore,
   });
 
   final FileItem item;
@@ -23,6 +24,9 @@ class FileTile extends StatelessWidget {
 
   /// Replaces the default "size · date" line.
   final String? subtitle;
+
+  /// Shows a ⋮ button that opens Quick Actions.
+  final VoidCallback? onMore;
 
   @override
   Widget build(BuildContext context) {
@@ -65,7 +69,14 @@ class FileTile extends StatelessWidget {
       onTap: onTap,
       onLongPress: onLongPress,
       selected: selected,
-      trailing: trailing,
+      trailing: trailing ??
+          (onMore == null
+              ? null
+              : IconButton(
+            icon: const Icon(Icons.more_vert),
+            tooltip: 'Quick actions',
+            onPressed: onMore,
+          )),
       selectedTileColor: scheme.primaryContainer.withValues(alpha: 0.7),
       leading: AnimatedSwitcher(
         duration: motion(context, 200),
