@@ -17,6 +17,8 @@ class MediaService {
     bool audioOnly = false,
     int? height,
     int? videoKbps,
+    int? startMs,
+    int? endMs,
     void Function(int percent)? onProgress,
   }) async {
     _onProgress = onProgress;
@@ -33,6 +35,8 @@ class MediaService {
         'audio': audioOnly,
         'height': height ?? 0,
         'videoKbps': videoKbps ?? 0,
+        'startMs': startMs ?? 0,
+        'endMs': endMs ?? 0,
       });
     } on PlatformException catch (e) {
       if (e.code == 'cancelled') throw const MediaCancelled();
@@ -46,6 +50,16 @@ class MediaService {
       throw const FormatException('Conversion needs the latest Polo build');
     } finally {
       _onProgress = null;
+    }
+  }
+
+  /// The length of an audio or video file in milliseconds, or 0 if unknown.
+  static Future<int> duration(String path) async {
+    try {
+      final v = await _channel.invokeMethod<num>('duration', {'path': path});
+      return v?.round() ?? 0;
+    } catch (_) {
+      return 0;
     }
   }
 

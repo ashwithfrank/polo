@@ -37,6 +37,10 @@ import 'polo_message.dart';
 import 'progress_dialog.dart';
 import '../screens/media_convert_screen.dart';
 import '../services/settings_controller.dart';
+import '../screens/trim_screen.dart';
+import '../screens/pdf_lock_screen.dart';
+import '../screens/text_stats_screen.dart';
+import '../screens/find_replace_screen.dart';
 
 /// One thing you can do to a file. [run] returns true if the folder's
 /// contents may have changed, so the caller should refresh.
@@ -243,6 +247,9 @@ List<_Action> _typeActions(FileItem item) {
     out.add(_Action(Icons.music_note_outlined, 'Convert to M4A',
         (c) => _push(c, MediaConvertScreen(item: item, job: MediaJob.toM4a))));
   }
+  if (item.kind == FileKind.audio || item.kind == FileKind.video) {
+    out.add(_Action(Icons.content_cut, 'Trim', (c) => _push(c, TrimScreen(item: item))));
+  }
 
   if (item.kind == FileKind.pdf) {
     out.addAll([
@@ -251,6 +258,8 @@ List<_Action> _typeActions(FileItem item) {
           (c) => _push(c, PdfOrganizeScreen(item: item))),
       _Action(Icons.image_outlined, 'Save pages as pictures',
           (c) => _push(c, PdfToImagesScreen(item: item))),
+      _Action(Icons.lock_outline, 'Lock or unlock',
+          (c) => _push(c, PdfLockScreen(item: item))),
       _Action(Icons.document_scanner_outlined, 'Read scanned text (OCR)',
           (c) => _push(c, PdfOcrScreen(item: item))),
       _Action(Icons.text_snippet_outlined, 'Extract text', (c) async {
@@ -263,6 +272,10 @@ List<_Action> _typeActions(FileItem item) {
   if (_isText(item)) {
     out.addAll([
       _Action(Icons.edit_outlined, 'Edit', (c) => _push(c, TextEditorScreen(item: item))),
+      _Action(Icons.format_list_numbered, 'Word count',
+          (c) => _push(c, TextStatsScreen(item: item))),
+      _Action(Icons.find_replace, 'Find and replace',
+          (c) => _push(c, FindReplaceScreen(files: [item]))),
       _Action(Icons.picture_as_pdf_outlined, 'Make a PDF', (c) async {
         await textFileToPdf(c, item);
         return true;

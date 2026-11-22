@@ -167,16 +167,21 @@ class _PdfPageState extends State<PdfPage> {
     }
   }
 
+  int _passwordTries = 0;
+
   Future<String?> _askPassword() async {
     if (!mounted) return null;
+    // The reader asks again when the last password was wrong.
+    final again = _passwordTries++ > 0;
     return showDialog<String>(
       context: context,
       barrierDismissible: false,
-      builder: (_) => const _PromptDialog(
+      builder: (_) => _PromptDialog(
         title: 'Password needed',
         hint: 'Password',
         confirmLabel: 'Open',
         obscure: true,
+        error: again ? 'That password is not right. Try again' : null,
       ),
     );
   }
@@ -213,8 +218,8 @@ class _PdfPageState extends State<PdfPage> {
     final label = _searcher.isSearching
         ? '…'
         : matches == 0
-        ? (_query.text.isEmpty ? '' : '0')
-        : '${(current ?? 0) + 1}/$matches';
+            ? (_query.text.isEmpty ? '' : '0')
+            : '${(current ?? 0) + 1}/$matches';
 
     return Material(
       color: scheme.surfaceContainerHighest,
@@ -271,6 +276,40 @@ class _PdfPageState extends State<PdfPage> {
       passwordProvider: _askPassword,
       params: PdfViewerParams(
         backgroundColor: scheme.surfaceContainerHighest,
+        errorBannerBuilder: (context, error, stackTrace, documentRef) {
+          final locked = error is PdfPasswordException;
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(locked ? Icons.lock_outline : Icons.error_outline,
+                      size: 56, color: scheme.primary),
+                  const SizedBox(height: 16),
+                  Text(
+                    locked ? 'This PDF needs a password' : "Couldn't open this PDF",
+                    style: Theme.of(context).textTheme.titleMedium,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    locked
+                        ? 'Open it again and type the password to read it.'
+                        : 'The file may be damaged.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: scheme.onSurface.withValues(alpha: 0.7)),
+                  ),
+                  const SizedBox(height: 20),
+                  FilledButton(
+                    onPressed: () => Navigator.of(context).maybePop(),
+                    child: const Text('Go back'),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
         pagePaintCallbacks: [_searcher.pageTextMatchPaintCallback],
         viewerOverlayBuilder: (context, size, handleLinkTap) => [
           PdfViewerScrollThumb(
@@ -369,48 +408,48 @@ class _PdfPageState extends State<PdfPage> {
                   behavior: HitTestBehavior.translucent,
                   onPointerDown: (_) => _scheduleHide(),
                   child: Center(
-                    child: Material(
-                      color: Colors.black54,
+              child: Material(
+                color: Colors.black54,
+                borderRadius: BorderRadius.circular(24),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    InkWell(
                       borderRadius: BorderRadius.circular(24),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          InkWell(
-                            borderRadius: BorderRadius.circular(24),
-                            onTap: _jumpToPage,
-                            child: Padding(
-                              padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
-                              child: Text(
-                                '$_page / $_count',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
+                      onTap: _jumpToPage,
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+                        child: Text(
+                          '$_page / $_count',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
                           ),
-                          _tool(Icons.search, 'Search', _toggleSearch, on: _searching),
-                          _tool(Icons.zoom_out, 'Zoom out', () => _controller.zoomDown()),
-                          _tool(Icons.zoom_in, 'Zoom in', () => _controller.zoomUp()),
-                          _tool(
-                            Icons.fit_screen_outlined,
-                            'Fit page',
-                                () => _controller.goToPage(
-                              pageNumber: _page,
-                              anchor: PdfPageAnchor.all,
-                            ),
-                          ),
-                          _tool(
-                            _night ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
-                            'Reading mode',
-                                () => _setNight(!_night),
-                            on: _night,
-                          ),
-                          const SizedBox(width: 4),
-                        ],
+                        ),
                       ),
                     ),
-                  ),
+                    _tool(Icons.search, 'Search', _toggleSearch, on: _searching),
+                    _tool(Icons.zoom_out, 'Zoom out', () => _controller.zoomDown()),
+                    _tool(Icons.zoom_in, 'Zoom in', () => _controller.zoomUp()),
+                    _tool(
+                      Icons.fit_screen_outlined,
+                      'Fit page',
+                      () => _controller.goToPage(
+                        pageNumber: _page,
+                        anchor: PdfPageAnchor.all,
+                      ),
+                    ),
+                    _tool(
+                      _night ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
+                      'Reading mode',
+                      () => _setNight(!_night),
+                      on: _night,
+                    ),
+                    const SizedBox(width: 4),
+                  ],
+                ),
+              ),
+            ),
                 ),
               ),
             ),
@@ -429,8 +468,10 @@ class _PromptDialog extends StatefulWidget {
     required this.confirmLabel,
     this.obscure = false,
     this.number = false,
+    this.error,
   });
 
+  final String? error;
   final String title;
   final String hint;
   final String confirmLabel;
@@ -459,7 +500,7 @@ class _PromptDialogState extends State<_PromptDialog> {
         autofocus: true,
         obscureText: widget.obscure,
         keyboardType: widget.number ? TextInputType.number : TextInputType.text,
-        decoration: InputDecoration(hintText: widget.hint),
+        decoration: InputDecoration(hintText: widget.hint, errorText: widget.error),
         onSubmitted: (v) => Navigator.pop(context, v),
       ),
       actions: [

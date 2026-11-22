@@ -43,6 +43,7 @@ class MainActivity : FlutterActivity() {
         mediaChannel.setMethodCallHandler { call, result ->
             when (call.method) {
                 "convert" -> converter.convert(call.arguments as Map<*, *>, result)
+                "duration" -> result.success(converter.duration(call.argument<String>("path") ?: ""))
                 "cancel" -> {
                     converter.cancel()
                     result.success(null)
@@ -50,6 +51,40 @@ class MainActivity : FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
+
+        // PDF passwords.
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.aos.polo/pdflock")
+            .setMethodCallHandler { call, result ->
+                val input = call.argument<String>("input")
+                val output = call.argument<String>("output")
+                val password = call.argument<String>("password") ?: ""
+                if (input == null) {
+                    result.error("bad_args", "No file was given", null)
+                    return@setMethodCallHandler
+                }
+                executor.execute {
+                    try {
+                        val value: Any? = when (call.method) {
+                            "isLocked" -> PdfLock.isLocked(this, input)
+                            "lock" -> { PdfLock.lock(this, input, output!!, password); null }
+                            "unlock" -> { PdfLock.unlock(this, input, output!!, password); null }
+                            else -> {
+                                runOnUiThread { result.notImplemented() }
+                                return@execute
+                            }
+                        }
+                        runOnUiThread { result.success(value) }
+                    } catch (e: com.tom_roush.pdfbox.pdmodel.encryption.InvalidPasswordException) {
+                        runOnUiThread { result.error("wrong_password", "Wrong password", null) }
+                    } catch (e: Throwable) {
+                        val wrong = e.message?.contains("password", ignoreCase = true) == true
+                        runOnUiThread {
+                            if (wrong) result.error("wrong_password", "Wrong password", null)
+                            else result.error("failed", e.message ?: "Couldn't change this PDF", null)
+                        }
+                    }
+                }
+            }
 
         // Total and free space on internal storage (shown on the Home screen).
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "cos.aos.polo/storage")

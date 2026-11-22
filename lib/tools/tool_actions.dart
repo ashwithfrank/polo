@@ -32,6 +32,10 @@ import '../widgets/progress_dialog.dart';
 import '../widgets/polo_message.dart';
 import '../screens/pdf_ocr_screen.dart';
 import '../screens/media_convert_screen.dart';
+import '../screens/trim_screen.dart';
+import '../screens/pdf_lock_screen.dart';
+import '../screens/text_stats_screen.dart';
+import '../screens/find_replace_screen.dart';
 
 // What each tool does when it is tapped. The list of tools is in
 // tools_registry.dart.
@@ -329,6 +333,50 @@ Future<void> runMedia(BuildContext context, MediaJob job) async {
   await Navigator.of(context).push(
     MaterialPageRoute(builder: (_) => MediaConvertScreen(item: picked.first, job: job)),
   );
+}
+
+Future<void> runTrim(BuildContext context) async {
+  final picked = await Navigator.of(context).push<List<FileItem>>(
+    MaterialPageRoute(
+      builder: (_) => PickFilesScreen(
+        title: 'Choose audio or video',
+        accepts: (f) => !f.isDirectory && (f.kind == FileKind.audio || f.kind == FileKind.video),
+        single: true,
+      ),
+    ),
+  );
+  if (picked == null || picked.isEmpty || !context.mounted) return;
+  await Navigator.of(context).push(MaterialPageRoute(builder: (_) => TrimScreen(item: picked.first)));
+}
+
+Future<void> runPdfLock(BuildContext context) async {
+  final picked = await _pickPdfs(context, title: 'Choose a PDF', single: true);
+  if (picked == null || picked.isEmpty || !context.mounted) return;
+  await Navigator.of(context).push(MaterialPageRoute(builder: (_) => PdfLockScreen(item: picked.first)));
+}
+
+Future<List<FileItem>?> _pickText(BuildContext context, {required bool single}) {
+  return Navigator.of(context).push<List<FileItem>>(
+    MaterialPageRoute(
+      builder: (_) => PickFilesScreen(
+        title: single ? 'Choose a text file' : 'Choose text files',
+        accepts: (f) => !f.isDirectory && textExtensions.contains(f.extension),
+        single: single,
+      ),
+    ),
+  );
+}
+
+Future<void> runWordCount(BuildContext context) async {
+  final picked = await _pickText(context, single: true);
+  if (picked == null || picked.isEmpty || !context.mounted) return;
+  await Navigator.of(context).push(MaterialPageRoute(builder: (_) => TextStatsScreen(item: picked.first)));
+}
+
+Future<void> runFindReplace(BuildContext context) async {
+  final picked = await _pickText(context, single: false);
+  if (picked == null || picked.isEmpty || !context.mounted) return;
+  await Navigator.of(context).push(MaterialPageRoute(builder: (_) => FindReplaceScreen(files: picked)));
 }
 
 Future<void> runPdfOcr(BuildContext context) async {

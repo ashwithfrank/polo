@@ -1,1 +1,3 @@
 -dontwarn com.google.mlkit.vision.text.**
+-dontwarn com.gemalto.jp2.**
+-dontwarn org.bouncycastle.**

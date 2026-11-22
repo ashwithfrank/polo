@@ -31,7 +31,7 @@ class PdfToolsService {
       return await PdfDocument.openFile(path);
     } on PdfPasswordException {
       throw FormatException(
-        '${path.split('/').last} is password-protected. Polo can\'t edit protected PDFs yet',
+        '${path.split('/').last} is password-protected. Unlock it first with Lock or unlock PDF',
       );
     } catch (_) {
       throw FormatException("Couldn't open ${path.split('/').last}");

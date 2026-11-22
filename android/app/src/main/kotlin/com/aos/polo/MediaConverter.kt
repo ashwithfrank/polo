@@ -44,6 +44,8 @@ class MediaConverter(private val activity: Activity, private val channel: Method
         val audio = args["audio"] == true
         val height = (args["height"] as? Number)?.toInt() ?: 0
         val kbps = (args["videoKbps"] as? Number)?.toInt() ?: 0
+        val startMs = (args["startMs"] as? Number)?.toLong() ?: 0L
+        val endMs = (args["endMs"] as? Number)?.toLong() ?: 0L
 
         if (audio && !hasSound(input)) {
             result.error("noaudio", "No sound", null)
@@ -52,7 +54,16 @@ class MediaConverter(private val activity: Activity, private val channel: Method
 
         try {
             File(output).delete()
-            val item = EditedMediaItem.Builder(MediaItem.fromUri(Uri.fromFile(File(input))))
+            val media = MediaItem.Builder().setUri(Uri.fromFile(File(input)))
+            if (endMs > startMs) {
+                media.setClippingConfiguration(
+                    MediaItem.ClippingConfiguration.Builder()
+                        .setStartPositionMs(startMs)
+                        .setEndPositionMs(endMs)
+                        .build()
+                )
+            }
+            val item = EditedMediaItem.Builder(media.build())
             if (audio) {
                 item.setRemoveVideo(true)
             } else if (height > 0) {
@@ -119,6 +130,19 @@ class MediaConverter(private val activity: Activity, private val channel: Method
             r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_HAS_AUDIO) != null
         } catch (e: Exception) {
             true
+        } finally {
+            try { r.release() } catch (e: Exception) {}
+        }
+    }
+
+    /** Length of a media file in milliseconds, or 0 when unknown. */
+    fun duration(path: String): Long {
+        val r = MediaMetadataRetriever()
+        return try {
+            r.setDataSource(path)
+            r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
+        } catch (e: Exception) {
+            0L
         } finally {
             try { r.release() } catch (e: Exception) {}
         }
