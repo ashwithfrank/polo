@@ -15,6 +15,7 @@ import '../widgets/open_file.dart';
 import 'customize_home_screen.dart';
 import '../services/path_items.dart';
 import '../widgets/quick_actions.dart';
+import 'favorites_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({
@@ -80,6 +81,11 @@ class HomeScreen extends StatelessWidget {
                 title: 'Favourites',
                 paths: settings.favoriteFiles,
                 empty: 'Star a file or folder from its ⋮ menu to keep it here.',
+                onSeeAll: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => FavoritesScreen(settings: settings, onOpenFolder: onOpenFolder),
+                  ),
+                ),
               ),
             'opened' => _pathList(
                 context,
@@ -218,6 +224,7 @@ class HomeScreen extends StatelessWidget {
     required String empty,
     int limit = 8,
     VoidCallback? onClear,
+    VoidCallback? onSeeAll,
   }) {
     final items = itemsFromPaths(paths).take(limit).toList();
     return Column(
@@ -226,6 +233,8 @@ class HomeScreen extends StatelessWidget {
         Row(
           children: [
             Expanded(child: Text(title, style: titleStyle)),
+            if (onSeeAll != null && items.isNotEmpty)
+              TextButton(onPressed: onSeeAll, child: const Text('See all')),
             if (onClear != null && items.isNotEmpty)
               TextButton(onPressed: onClear, child: const Text('Clear')),
           ],
