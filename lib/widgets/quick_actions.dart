@@ -36,6 +36,7 @@ import 'open_file.dart';
 import 'polo_message.dart';
 import 'progress_dialog.dart';
 import '../screens/media_convert_screen.dart';
+import '../services/settings_controller.dart';
 
 /// One thing you can do to a file. [run] returns true if the folder's
 /// contents may have changed, so the caller should refresh.
@@ -182,6 +183,16 @@ List<_Action> _mainActions(FileItem item) {
         await shareFiles(c, [item]);
         return false;
       }),
+    _Action(
+      (SettingsController.current?.isFavorite(item.path) ?? false)
+          ? Icons.star
+          : Icons.star_outline,
+      (SettingsController.current?.isFavorite(item.path) ?? false) ? 'Unstar' : 'Favourite',
+      (c) async {
+        await SettingsController.current?.toggleFavorite(item.path);
+        return true;
+      },
+    ),
     _Action(Icons.drive_file_rename_outline, 'Rename', _rename(item)),
     _Action(Icons.folder_zip_outlined, 'ZIP', (c) => zipFiles(c, [item])),
     _Action(Icons.delete_outline, 'Delete', (c) async {

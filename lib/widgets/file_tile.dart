@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'motion.dart';
 import '../models/file_item.dart';
 import 'file_thumb.dart';
+import '../services/settings_controller.dart';
 
 class FileTile extends StatelessWidget {
   const FileTile({
@@ -73,10 +74,10 @@ class FileTile extends StatelessWidget {
           (onMore == null
               ? null
               : IconButton(
-            icon: const Icon(Icons.more_vert),
-            tooltip: 'Quick actions',
-            onPressed: onMore,
-          )),
+                  icon: const Icon(Icons.more_vert),
+                  tooltip: 'Quick actions',
+                  onPressed: onMore,
+                )),
       selectedTileColor: scheme.primaryContainer.withValues(alpha: 0.7),
       leading: AnimatedSwitcher(
         duration: motion(context, 200),
@@ -86,7 +87,15 @@ class FileTile extends StatelessWidget {
         ),
         child: leading,
       ),
-      title: Text(item.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+      title: Row(
+        children: [
+          Flexible(child: Text(item.name, maxLines: 1, overflow: TextOverflow.ellipsis)),
+          if (SettingsController.current?.isFavorite(item.path) ?? false) ...[
+            const SizedBox(width: 6),
+            Icon(Icons.star, size: 14, color: Colors.amber.shade700),
+          ],
+        ],
+      ),
       subtitle: Text(
         subtitle ??
             (item.isDirectory ? item.dateLabel : '${item.sizeLabel} · ${item.dateLabel}'),

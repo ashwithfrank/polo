@@ -26,7 +26,11 @@ class SettingsController extends ChangeNotifier {
   static const _hapticKey = 'haptics';
   static const _animKey = 'animations';
   static const _outputKey = 'output_mode';
+  static const _favFilesKey = 'fav_files';
+  static const _openedKey = 'opened_files';
 
+  final List<String> _favFiles = [];
+  final List<String> _opened = [];
   int _longPressMs = 400;
   bool _dragSelect = true;
   bool _haptics = true;
@@ -43,6 +47,13 @@ class SettingsController extends ChangeNotifier {
 
   /// How long to hold on a file before it gets selected.
   int get longPressMs => _longPressMs;
+
+  /// Files and folders the person starred, newest first.
+  List<String> get favoriteFiles => List.unmodifiable(_favFiles);
+  bool isFavorite(String path) => _favFiles.contains(path);
+
+  /// Files opened in Polo, most recent first.
+  List<String> get openedFiles => List.unmodifiable(_opened);
   bool get dragSelect => _dragSelect;
   bool get haptics => _haptics;
   bool get animations => _animations;
@@ -68,6 +79,12 @@ class SettingsController extends ChangeNotifier {
       orElse: () => SortBy.name,
     );
     _showHidden = prefs.getBool(_hiddenKey) ?? false;
+    _favFiles
+      ..clear()
+      ..addAll(prefs.getStringList(_favFilesKey) ?? const []);
+    _opened
+      ..clear()
+      ..addAll(prefs.getStringList(_openedKey) ?? const []);
     _longPressMs = (prefs.getInt(_longPressKey) ?? 400).clamp(250, 1000);
     _dragSelect = prefs.getBool(_dragKey) ?? true;
     _haptics = prefs.getBool(_hapticKey) ?? true;
@@ -99,6 +116,36 @@ class SettingsController extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_sortKey, value.name);
+  }
+
+  Future<void> toggleFavorite(String path) async {
+    if (!_favFiles.remove(path)) _favFiles.insert(0, path);
+    notifyListeners();
+    (await SharedPreferences.getInstance()).setStringList(_favFilesKey, _favFiles);
+  }
+
+  Future<void> addFavorites(Iterable<String> paths) async {
+    for (final p in paths) {
+      if (!_favFiles.contains(p)) _favFiles.insert(0, p);
+    }
+    notifyListeners();
+    (await SharedPreferences.getInstance()).setStringList(_favFilesKey, _favFiles);
+  }
+
+  /// Remembers that [path] was just opened.
+  Future<void> noteOpened(String path) async {
+    _opened
+      ..remove(path)
+      ..insert(0, path);
+    if (_opened.length > 20) _opened.removeRange(20, _opened.length);
+    notifyListeners();
+    (await SharedPreferences.getInstance()).setStringList(_openedKey, _opened);
+  }
+
+  Future<void> clearOpened() async {
+    _opened.clear();
+    notifyListeners();
+    (await SharedPreferences.getInstance()).remove(_openedKey);
   }
 
   Future<void> setLongPressMs(int value) async {

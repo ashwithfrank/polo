@@ -345,6 +345,12 @@ class _BrowseScreenState extends State<BrowseScreen> with WidgetsBindingObserver
               ),
             if (!single)
               ListTile(
+                leading: const Icon(Icons.star_outline),
+                title: const Text('Add to favourites'),
+                onTap: () => Navigator.pop(context, 'fav'),
+              ),
+            if (!single)
+              ListTile(
                 leading: const Icon(Icons.drive_file_rename_outline),
                 title: const Text('Batch rename'),
                 onTap: () => Navigator.pop(context, 'batchrename'),
@@ -400,6 +406,11 @@ class _BrowseScreenState extends State<BrowseScreen> with WidgetsBindingObserver
         await showFileDetails(context, items.first);
       case 'rename':
         await _rename();
+      case 'fav':
+        await widget.settings.addFavorites(items.map((i) => i.path));
+        if (!mounted) return;
+        setState(_selected.clear);
+        showPoloMessage(context, 'Added ${items.length} to favourites');
       case 'batchrename':
         final renamed = await Navigator.of(context).push<bool>(
           MaterialPageRoute(builder: (_) => BatchRenameScreen(items: items)),

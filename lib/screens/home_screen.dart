@@ -13,6 +13,8 @@ import '../widgets/message_view.dart';
 import '../widgets/motion.dart';
 import '../widgets/open_file.dart';
 import 'customize_home_screen.dart';
+import '../services/path_items.dart';
+import '../widgets/quick_actions.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({
@@ -61,16 +63,34 @@ class HomeScreen extends StatelessWidget {
           if (settings.isHomeHidden(id)) continue;
           final section = switch (id) {
             'storage' => Reveal(
-              index: step,
-              child: _StorageCard(
-                info: controller.info,
-                loading: controller.loading,
-                onTap: onOpenStorage,
+                index: step,
+                child: _StorageCard(
+                  info: controller.info,
+                  loading: controller.loading,
+                  onTap: onOpenStorage,
+                ),
               ),
-            ),
             'vault' => Reveal(index: step, child: _VaultCard(onTap: onOpenVault)),
             'categories' => _categories(context, step, titleStyle),
             'quick' => _quick(context, step, titleStyle),
+            'favorites' => _pathList(
+                context,
+                step,
+                titleStyle,
+                title: 'Favourites',
+                paths: settings.favoriteFiles,
+                empty: 'Star a file or folder from its ⋮ menu to keep it here.',
+              ),
+            'opened' => _pathList(
+                context,
+                step,
+                titleStyle,
+                title: 'Recently opened',
+                paths: settings.openedFiles,
+                empty: 'Files you open will show up here.',
+                limit: 6,
+                onClear: settings.clearOpened,
+              ),
             'recent' => _recent(context, step, titleStyle, scan),
             _ => const SizedBox.shrink(),
           };
@@ -185,6 +205,56 @@ class HomeScreen extends StatelessWidget {
               ),
           ],
         ),
+      ],
+    );
+  }
+
+  Widget _pathList(
+    BuildContext context,
+    int step,
+    TextStyle? titleStyle, {
+    required String title,
+    required List<String> paths,
+    required String empty,
+    int limit = 8,
+    VoidCallback? onClear,
+  }) {
+    final items = itemsFromPaths(paths).take(limit).toList();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(child: Text(title, style: titleStyle)),
+            if (onClear != null && items.isNotEmpty)
+              TextButton(onPressed: onClear, child: const Text('Clear')),
+          ],
+        ),
+        const SizedBox(height: 4),
+        if (items.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: Center(
+              child: Text(
+                empty,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                ),
+              ),
+            ),
+          )
+        else
+          for (final (n, item) in items.indexed)
+            Reveal(
+              index: step + n,
+              child: FileTile(
+                item: item,
+                onTap: () =>
+                    item.isDirectory ? onOpenFolder(item.path) : openFile(context, item),
+                onMore: () => showQuickActions(context, item),
+              ),
+            ),
       ],
     );
   }

@@ -6,6 +6,7 @@ import '../models/file_item.dart';
 import '../screens/viewer/viewer_screen.dart';
 import '../services/file_service.dart';
 import 'open_external.dart';
+import '../services/settings_controller.dart';
 
 /// Opens a file. Images, videos, audio and text open in Polo's own viewer;
 /// everything else opens in another app.
@@ -13,6 +14,7 @@ import 'open_external.dart';
 /// Returns the files that were moved to the trash from inside the viewer, so
 /// the caller can refresh its list.
 Future<List<FileItem>> openFile(BuildContext context, FileItem item) async {
+  SettingsController.current?.noteOpened(item.path);
   if (!canView(item)) {
     await openExternally(context, item);
     return const [];

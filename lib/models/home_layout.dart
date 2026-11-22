@@ -14,6 +14,8 @@ const homeSections = <HomeSection>[
   HomeSection('vault', 'Vault', Icons.lock_outline),
   HomeSection('categories', 'Categories', Icons.category_outlined),
   HomeSection('quick', 'Quick access', Icons.bolt_outlined),
+  HomeSection('favorites', 'Favourites', Icons.star_outline),
+  HomeSection('opened', 'Recently opened', Icons.visibility_outlined),
   HomeSection('recent', 'Recent files', Icons.history),
 ];
 
@@ -37,6 +39,7 @@ const quickPresets = <QuickFolder>[
   QuickFolder('Documents', 'Documents', Icons.description_outlined, Colors.blue),
   QuickFolder('Music', 'Music', Icons.music_note_outlined, Colors.teal),
   QuickFolder('Movies', 'Movies', Icons.movie_outlined, Colors.deepPurple),
+  QuickFolder('Polo', 'Polo', Icons.folder_special_outlined, Colors.deepOrange),
 ];
 
 bool isPresetFolder(String path) => quickPresets.any((p) => p.path == path);
