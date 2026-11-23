@@ -8,6 +8,7 @@ import '../widgets/accent_picker.dart';
 import 'about_screen.dart';
 import 'customize_home_screen.dart';
 import 'trash_screen.dart';
+import '../widgets/haptics.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({
@@ -151,6 +152,23 @@ class SettingsScreen extends StatelessWidget {
                 value: settings.haptics,
                 onChanged: settings.setHaptics,
               ),
+              if (settings.haptics)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  child: SegmentedButton<int>(
+                    showSelectedIcon: false,
+                    segments: const [
+                      ButtonSegment(value: 1, label: Text('Light')),
+                      ButtonSegment(value: 2, label: Text('Medium')),
+                      ButtonSegment(value: 3, label: Text('Strong')),
+                    ],
+                    selected: {settings.hapticStrength},
+                    onSelectionChanged: (v) {
+                      settings.setHapticStrength(v.first);
+                      Haptics.test();
+                    },
+                  ),
+                ),
               SwitchListTile(
                 title: const Text('Animations'),
                 subtitle: const Text('Fades, slides and press effects'),

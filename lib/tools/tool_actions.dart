@@ -36,6 +36,10 @@ import '../screens/trim_screen.dart';
 import '../screens/pdf_lock_screen.dart';
 import '../screens/text_stats_screen.dart';
 import '../screens/find_replace_screen.dart';
+import '../screens/pdf_stamp_screen.dart';
+import '../screens/zip_protect_screen.dart';
+import '../screens/zip_unlock_screen.dart';
+import '../screens/collage_screen.dart';
 
 // What each tool does when it is tapped. The list of tools is in
 // tools_registry.dart.
@@ -316,6 +320,61 @@ Future<List<FileItem>?> _pickPdfs(
       builder: (_) => PickFilesScreen(title: title, accepts: _isPdf, single: single),
     ),
   );
+}
+
+Future<void> runPdfStamp(BuildContext context, StampMode mode) async {
+  final picked = await _pickPdfs(context, title: 'Choose a PDF', single: true);
+  if (picked == null || picked.isEmpty || !context.mounted) return;
+  await Navigator.of(context).push(
+    MaterialPageRoute(builder: (_) => PdfStampScreen(item: picked.first, mode: mode)),
+  );
+}
+
+Future<void> runZipProtect(BuildContext context) async {
+  final picked = await Navigator.of(context).push<List<FileItem>>(
+    MaterialPageRoute(
+      builder: (_) => const PickFilesScreen(
+        title: 'Choose files and folders to zip',
+        accepts: _anyFile,
+        selectFolders: true,
+      ),
+    ),
+  );
+  if (picked == null || picked.isEmpty || !context.mounted) return;
+  await Navigator.of(context).push(MaterialPageRoute(builder: (_) => ZipProtectScreen(items: picked)));
+}
+
+bool _anyFile(FileItem f) => true;
+
+Future<void> runZipUnlock(BuildContext context) async {
+  final picked = await Navigator.of(context).push<List<FileItem>>(
+    MaterialPageRoute(
+      builder: (_) => PickFilesScreen(
+        title: 'Choose a ZIP',
+        accepts: (f) => !f.isDirectory && f.extension == 'zip',
+        single: true,
+      ),
+    ),
+  );
+  if (picked == null || picked.isEmpty || !context.mounted) return;
+  await Navigator.of(context).push(MaterialPageRoute(builder: (_) => ZipUnlockScreen(item: picked.first)));
+}
+
+Future<void> runCollage(BuildContext context) async {
+  final picked = await Navigator.of(context).push<List<FileItem>>(
+    MaterialPageRoute(
+      builder: (_) => PickFilesScreen(
+        title: 'Choose 2 to 9 pictures',
+        accepts: (f) => !f.isDirectory && f.kind == FileKind.image,
+      ),
+    ),
+  );
+  if (picked == null || !context.mounted) return;
+  if (picked.length < 2) {
+    showPoloMessage(context, 'Choose at least 2 pictures');
+    return;
+  }
+  await Navigator.of(context).push(MaterialPageRoute(builder: (_) => CollageScreen(pictures: picked)));
 }
 
 Future<void> runMedia(BuildContext context, MediaJob job) async {

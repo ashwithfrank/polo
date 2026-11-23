@@ -91,7 +91,7 @@ class _DragSelectAreaState extends State<DragSelectArea> {
     _last = _anchor;
     _base = Set.of(widget.selected);
     _adding = !_base.contains(path);
-    Haptics.select();
+    Haptics.strong();
     _apply(_anchor, _anchor);
     if (_drag) {
       _scroller = Timer.periodic(const Duration(milliseconds: 16), (_) => _autoScroll());

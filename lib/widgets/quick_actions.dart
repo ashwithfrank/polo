@@ -41,6 +41,8 @@ import '../screens/trim_screen.dart';
 import '../screens/pdf_lock_screen.dart';
 import '../screens/text_stats_screen.dart';
 import '../screens/find_replace_screen.dart';
+import '../screens/pdf_stamp_screen.dart';
+import '../screens/zip_unlock_screen.dart';
 
 /// One thing you can do to a file. [run] returns true if the folder's
 /// contents may have changed, so the caller should refresh.
@@ -258,6 +260,10 @@ List<_Action> _typeActions(FileItem item) {
           (c) => _push(c, PdfOrganizeScreen(item: item))),
       _Action(Icons.image_outlined, 'Save pages as pictures',
           (c) => _push(c, PdfToImagesScreen(item: item))),
+      _Action(Icons.branding_watermark_outlined, 'Watermark',
+          (c) => _push(c, PdfStampScreen(item: item, mode: StampMode.watermark))),
+      _Action(Icons.format_list_numbered_rtl, 'Page numbers',
+          (c) => _push(c, PdfStampScreen(item: item, mode: StampMode.pageNumbers))),
       _Action(Icons.lock_outline, 'Lock or unlock',
           (c) => _push(c, PdfLockScreen(item: item))),
       _Action(Icons.document_scanner_outlined, 'Read scanned text (OCR)',
@@ -289,6 +295,8 @@ List<_Action> _typeActions(FileItem item) {
 
   if (item.extension == 'zip') {
     out.add(_Action(Icons.unarchive_outlined, 'Extract here', _extract(item)));
+    out.add(_Action(Icons.lock_open_outlined, 'Extract with password',
+        (c) => _push(c, ZipUnlockScreen(item: item))));
   }
 
   if (canView(item)) {

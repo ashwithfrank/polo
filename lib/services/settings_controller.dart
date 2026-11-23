@@ -25,6 +25,7 @@ class SettingsController extends ChangeNotifier {
   static const _dragKey = 'drag_select';
   static const _hapticKey = 'haptics';
   static const _animKey = 'animations';
+  static const _hapticLevelKey = 'haptic_level';
   static const _outputKey = 'output_mode';
   static const _favFilesKey = 'fav_files';
   static const _openedKey = 'opened_files';
@@ -34,6 +35,7 @@ class SettingsController extends ChangeNotifier {
   int _longPressMs = 400;
   bool _dragSelect = true;
   bool _haptics = true;
+  int _hapticStrength = 2;
   bool _animations = true;
   OutputMode _outputMode = OutputMode.smart;
 
@@ -56,6 +58,9 @@ class SettingsController extends ChangeNotifier {
   List<String> get openedFiles => List.unmodifiable(_opened);
   bool get dragSelect => _dragSelect;
   bool get haptics => _haptics;
+
+  /// 1 light, 2 medium, 3 strong.
+  int get hapticStrength => _hapticStrength;
   bool get animations => _animations;
   OutputMode get outputMode => _outputMode;
 
@@ -88,6 +93,7 @@ class SettingsController extends ChangeNotifier {
     _longPressMs = (prefs.getInt(_longPressKey) ?? 400).clamp(250, 1000);
     _dragSelect = prefs.getBool(_dragKey) ?? true;
     _haptics = prefs.getBool(_hapticKey) ?? true;
+    _hapticStrength = (prefs.getInt(_hapticLevelKey) ?? 2).clamp(1, 3);
     _animations = prefs.getBool(_animKey) ?? true;
     final om = prefs.getString(_outputKey);
     _outputMode = OutputMode.values.firstWhere((m) => m.name == om, orElse: () => OutputMode.smart);
@@ -166,6 +172,12 @@ class SettingsController extends ChangeNotifier {
     _haptics = value;
     notifyListeners();
     (await SharedPreferences.getInstance()).setBool(_hapticKey, value);
+  }
+
+  Future<void> setHapticStrength(int value) async {
+    _hapticStrength = value.clamp(1, 3);
+    notifyListeners();
+    (await SharedPreferences.getInstance()).setInt(_hapticLevelKey, _hapticStrength);
   }
 
   Future<void> setAnimations(bool value) async {

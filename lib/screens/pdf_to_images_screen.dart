@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/file_item.dart';
 import '../services/file_service.dart';
+import '../services/pdf_images_service.dart';
 import '../services/pdf_tools_service.dart';
 import '../widgets/pdf_result.dart';
 import '../widgets/progress_dialog.dart';
@@ -22,6 +23,7 @@ class _PdfToImagesScreenState extends State<PdfToImagesScreen> {
 
   int? _count;
   String? _loadError;
+  bool _original = true;
   bool _jpg = false;
   int _dpi = 150;
   bool _busy = false;
@@ -56,6 +58,32 @@ class _PdfToImagesScreenState extends State<PdfToImagesScreen> {
 
     try {
       final pages = parsePageRanges(_pages.text, count);
+      if (_original) {
+        setState(() => _busy = true);
+        final result = await runWithProgress(
+          context,
+          'Taking out the pictures…',
+          () => PdfImagesService(FileService()).extract(widget.item.path, pages),
+        );
+        if (!mounted) return;
+        if (result.pictures.isEmpty) {
+          setState(() {
+            _original = false;
+            _error = 'No pictures are stored inside these pages, so Polo switched to '
+                'Whole pages. Tap Save pictures again.';
+          });
+        } else {
+          final n = result.pictures.length;
+          final first = result.pictures.first;
+          setState(() {
+            _folder = result.folder;
+            _saved = 'Saved $n ${n == 1 ? 'picture' : 'pictures'} at their original size '
+                '(for example ${first.width} × ${first.height}) in "${result.folder.split('/').last}"';
+          });
+        }
+        if (mounted) setState(() => _busy = false);
+        return;
+      }
       final detail = ValueNotifier<String>('');
       setState(() => _busy = true);
       final folder = await runWithProgress(
@@ -121,6 +149,26 @@ class _PdfToImagesScreenState extends State<PdfToImagesScreen> {
           ),
           if (count != null) ...[
             const SizedBox(height: 16),
+            Text('Save', style: titleStyle),
+            const SizedBox(height: 8),
+            SegmentedButton<bool>(
+              showSelectedIcon: false,
+              segments: const [
+                ButtonSegment(value: true, label: Text('Original pictures')),
+                ButtonSegment(value: false, label: Text('Whole pages')),
+              ],
+              selected: {_original},
+              onSelectionChanged: locked ? null : (s) => setState(() => _original = s.first),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              _original
+                  ? 'Takes each picture out of the PDF exactly as it is stored: same size and quality, nothing re-compressed.'
+                  : 'Draws each page as one picture, text and all.',
+              style: muted,
+            ),
+            if (!_original) ...[
+            const SizedBox(height: 16),
             Text('Format', style: titleStyle),
             const SizedBox(height: 8),
             SegmentedButton<bool>(
@@ -153,6 +201,7 @@ class _PdfToImagesScreenState extends State<PdfToImagesScreen> {
             ),
             const SizedBox(height: 4),
             Text('150 is good for screens, 300 for printing.', style: muted),
+            ],
             const SizedBox(height: 16),
             TextField(
               controller: _pages,

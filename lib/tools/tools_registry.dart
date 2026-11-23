@@ -17,6 +17,7 @@ import '../services/cleanup_service.dart';
 import 'tool.dart';
 import 'tool_actions.dart';
 import '../screens/media_convert_screen.dart';
+import '../screens/pdf_stamp_screen.dart';
 
 const _mb = 1024 * 1024;
 
@@ -94,6 +95,51 @@ final List<Tool> allTools = [
     icon: Icons.audiotrack_outlined,
     category: ToolCategory.convert,
     keywords: ['mp3', 'mp4', 'music', 'extract'],
+  ),
+  Tool(
+    id: 'pdf_watermark',
+    title: 'Watermark PDF',
+    subtitle: 'Stamp text on every page',
+    icon: Icons.branding_watermark_outlined,
+    category: ToolCategory.documents,
+    keywords: ['pdf', 'watermark', 'stamp', 'confidential', 'draft', 'text'],
+    run: (c) => runPdfStamp(c, StampMode.watermark),
+  ),
+  Tool(
+    id: 'pdf_page_numbers',
+    title: 'PDF page numbers',
+    subtitle: 'Number every page',
+    icon: Icons.format_list_numbered_rtl,
+    category: ToolCategory.documents,
+    keywords: ['pdf', 'page', 'numbers', 'number', 'footer', 'header'],
+    run: (c) => runPdfStamp(c, StampMode.pageNumbers),
+  ),
+  Tool(
+    id: 'zip_protect',
+    title: 'Protected ZIP',
+    subtitle: 'Zip with a password',
+    icon: Icons.enhanced_encryption_outlined,
+    category: ToolCategory.privacy,
+    keywords: ['zip', 'password', 'encrypt', 'protect', 'compress', 'archive', 'secure'],
+    run: runZipProtect,
+  ),
+  Tool(
+    id: 'zip_unlock',
+    title: 'Open protected ZIP',
+    subtitle: 'Extract with a password',
+    icon: Icons.lock_open_outlined,
+    category: ToolCategory.privacy,
+    keywords: ['zip', 'password', 'extract', 'unzip', 'open', 'protected', 'encrypted'],
+    run: runZipUnlock,
+  ),
+  Tool(
+    id: 'collage',
+    title: 'Collage',
+    subtitle: 'Put pictures together',
+    icon: Icons.dashboard_outlined,
+    category: ToolCategory.images,
+    keywords: ['collage', 'photos', 'grid', 'combine', 'merge', 'pictures', 'images'],
+    run: runCollage,
   ),
   Tool(
     id: 'images_to_pdf',

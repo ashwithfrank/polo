@@ -68,6 +68,30 @@ class MainActivity : FlutterActivity() {
                             "isLocked" -> PdfLock.isLocked(this, input)
                             "lock" -> { PdfLock.lock(this, input, output!!, password); null }
                             "unlock" -> { PdfLock.unlock(this, input, output!!, password); null }
+                            "extractImages" -> PdfImages.extract(
+                                this, input, call.argument<String>("outDir")!!,
+                                call.argument<List<Int>>("pages") ?: emptyList()
+                            )
+                            "watermark" -> {
+                                PdfStamp.watermark(
+                                    this, input, output!!,
+                                    call.argument<String>("text") ?: "",
+                                    call.argument<Number>("size")!!.toFloat(),
+                                    call.argument<Number>("opacity")!!.toFloat(),
+                                    call.argument<Number>("angle")!!.toDouble()
+                                )
+                                null
+                            }
+                            "pageNumbers" -> {
+                                PdfStamp.pageNumbers(
+                                    this, input, output!!,
+                                    call.argument<String>("format") ?: "{n}",
+                                    call.argument<Number>("position")!!.toInt(),
+                                    call.argument<Number>("size")!!.toFloat(),
+                                    call.argument<Number>("start")!!.toInt()
+                                )
+                                null
+                            }
                             else -> {
                                 runOnUiThread { result.notImplemented() }
                                 return@execute
@@ -76,6 +100,8 @@ class MainActivity : FlutterActivity() {
                         runOnUiThread { result.success(value) }
                     } catch (e: com.tom_roush.pdfbox.pdmodel.encryption.InvalidPasswordException) {
                         runOnUiThread { result.error("wrong_password", "Wrong password", null) }
+                    } catch (e: IllegalArgumentException) {
+                        runOnUiThread { result.error("bad_text", e.message ?: "Unsupported characters", null) }
                     } catch (e: Throwable) {
                         val wrong = e.message?.contains("password", ignoreCase = true) == true
                         runOnUiThread {
@@ -83,6 +109,70 @@ class MainActivity : FlutterActivity() {
                             else result.error("failed", e.message ?: "Couldn't change this PDF", null)
                         }
                     }
+                }
+            }
+
+        // Password-protected ZIP files.
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.aos.polo/ziptool")
+            .setMethodCallHandler { call, result ->
+                executor.execute {
+                    try {
+                        val value: Any? = when (call.method) {
+                            "isEncrypted" -> ZipTool.isEncrypted(call.argument<String>("input")!!)
+                            "create" -> ZipTool.create(
+                                call.argument<List<String>>("paths") ?: emptyList(),
+                                call.argument<String>("output")!!,
+                                call.argument<String>("password") ?: ""
+                            )
+                            "extract" -> ZipTool.extract(
+                                call.argument<String>("input")!!,
+                                call.argument<String>("dest")!!,
+                                call.argument<String>("password") ?: ""
+                            )
+                            else -> {
+                                runOnUiThread { result.notImplemented() }
+                                return@execute
+                            }
+                        }
+                        runOnUiThread { result.success(value) }
+                    } catch (e: Throwable) {
+                        val wrong = ZipTool.isWrongPassword(e)
+                        runOnUiThread {
+                            if (wrong) result.error("wrong_password", "Wrong password", null)
+                            else result.error("failed", e.message ?: "Couldn't work with this ZIP", null)
+                        }
+                    }
+                }
+            }
+
+        // Short, reliable vibrations (the system's touch feedback is often off or too faint).
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.aos.polo/haptic")
+            .setMethodCallHandler { call, result ->
+                if (call.method != "buzz") {
+                    result.notImplemented()
+                    return@setMethodCallHandler
+                }
+                try {
+                    val ms = (call.argument<Number>("ms") ?: 15).toLong()
+                    val amp = (call.argument<Number>("amp") ?: 120).toInt().coerceIn(1, 255)
+                    @Suppress("DEPRECATION")
+                    val vibrator = if (Build.VERSION.SDK_INT >= 31) {
+                        (getSystemService(android.content.Context.VIBRATOR_MANAGER_SERVICE)
+                            as android.os.VibratorManager).defaultVibrator
+                    } else {
+                        getSystemService(android.content.Context.VIBRATOR_SERVICE) as android.os.Vibrator
+                    }
+                    if (vibrator.hasVibrator()) {
+                        if (Build.VERSION.SDK_INT >= 26) {
+                            vibrator.vibrate(android.os.VibrationEffect.createOneShot(ms, amp))
+                        } else {
+                            @Suppress("DEPRECATION")
+                            vibrator.vibrate(ms)
+                        }
+                    }
+                    result.success(null)
+                } catch (e: Exception) {
+                    result.error("failed", e.message, null)
                 }
             }
 

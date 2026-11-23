@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../services/settings_controller.dart';
+import 'haptics.dart';
 
 // Small, shared animation helpers. All of them switch themselves off when the
 // person has "Remove animations" turned on in Android's accessibility settings.
@@ -141,6 +142,7 @@ class PressScale extends StatefulWidget {
 
 class _PressScaleState extends State<PressScale> {
   bool _down = false;
+  Offset _downAt = Offset.zero;
 
   void _set(bool v) {
     if (_down != v) setState(() => _down = v);
@@ -149,8 +151,15 @@ class _PressScaleState extends State<PressScale> {
   @override
   Widget build(BuildContext context) {
     return Listener(
-      onPointerDown: (_) => _set(true),
-      onPointerUp: (_) => _set(false),
+      onPointerDown: (e) {
+        _downAt = e.position;
+        _set(true);
+      },
+      onPointerUp: (e) {
+        _set(false);
+        // A tap, not the end of a scroll.
+        if ((e.position - _downAt).distance < 12) Haptics.tap();
+      },
       onPointerCancel: (_) => _set(false),
       child: AnimatedScale(
         scale: _down ? 0.96 : 1,
