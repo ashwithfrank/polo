@@ -1,178 +1,59 @@
 # Polo
 
-A fast, clean file manager for Android with built-in tools, made with Flutter. Polo uses a warm orange and cream design with a light and dark theme.
+An offline file manager and toolbox for Android, made with Flutter by [AlphaOmega Studio](https://github.com/ashwithfrank).
 
-> Status: v1.0.0. File manager, vault, image and PDF tools, clean up, APK analyzer and developer tools. All offline.
+Package: `com.aos.polo` · Version: 1.6.0 · Android only
+
+Polo browses your files and ships with the tools people usually need a separate app for: convert, compress, scan, read text from pictures, work with PDFs, trim audio and video, and keep private files locked. Everything runs on your phone. There is no internet permission, no account, no ads and no analytics.
 
 ## Features
 
-**Home**
-- Storage summary: used, free and total space
-- Quick access to Downloads, Camera, Pictures, Documents, Music and Movies
-- Your most recent files
+### Browse and organize
+- Browse folders with breadcrumbs, list or grid view, sorting, and hidden files (optional)
+- Copy, move, rename, delete (with a 30 day Trash), share, create folders, conflict-safe paste
+- Hold a file, then slide up or down to select many at once; set the hold time in Settings
+- Quick Actions (⋮ menu) on every file, with actions that fit the file type
+- Batch rename with live preview, zip and unzip, duplicate finder
+- Search by name and browse by type (images, videos, audio, documents, archives, apps)
+- Favourites (star any file or folder) and Recently opened on Home
+- Inspector (details, checksums, metadata) and file compare
+- Open with Polo and Share to Polo from other apps, and pick files from Polo for other apps
+- Storage screen with a usage breakdown and the largest files
 
-**Browse**
-- Browse internal storage with a tappable breadcrumb path
-- Folders first, with a colored icon per file type
-- Sort by name, date or size, and show or hide hidden files
-- Multi-select with long-press, then copy, move, rename, delete and share
-- Create new folders
-- Name conflicts never overwrite: pasting `photo.jpg` next to an existing one gives `photo (1).jpg`
+### Tools
+- **Convert and compress:** images (PNG, JPG, WebP and more) with before/after preview and sharing presets, video compress, audio to M4A, video to audio, trim audio and video
+- **Images:** edit, resize, strip metadata and location, photo info, images to PDF
+- **PDF:** reader with search and night mode, merge, split, organize pages, PDF to images, text to PDF, lock and unlock with a password, scanned PDF to text
+- **Scan and create:** QR scanner and generator, text from a picture (OCR, Latin and Devanagari), document scanner
+- **Clean up:** large files, duplicates, empty folders
+- **Developer and text:** APK analyzer, checksums, encoders and formatters, password generator, text editor, word count, find and replace across files
+- **Vault:** password-locked private files (PBKDF2 and AES-256-GCM). A forgotten password cannot be recovered.
 
-**Browse**
-- Browse internal storage with a tappable breadcrumb path
-- List or grid view (saved), with real picture previews for images
-- Sort by name, date or size, and show or hide hidden files
-- Multi-select with long-press, then copy, move, share, delete and a More menu (rename, details, compress to ZIP, extract, convert, make PDF)
-- Create new folders
-- Name conflicts never overwrite: pasting `photo.jpg` next to an existing one gives `photo (1).jpg`
+### Look and feel
+- Orange and cream Material 3 design with light, dark and True black themes
+- Accent colours, customizable Home (reorder or hide sections), quick-access folders
+- Settings for where tools save results (next to the original or in a Polo folder), vibration, and animations
 
-**Search and categories**
-- Search every file and folder by name, with filter chips
-- Tap a category on Home or Storage to see all images, videos, audio, documents, archives or apps in one list
-
-**Tools** (grouped into category cards, searchable)
-- Convert and images: format converter, compress, edit (crop, rotate, resize), photo info (EXIF), remove metadata
-- PDF: merge, split, organize pages, PDF to images, PDF to text, text and Markdown to PDF, images to PDF
-- Organize: zip and unzip, batch rename, duplicate finder, checksums
-- Clean up: large files, old files, downloads cleaner, folder sizes
-- Developer: JSON formatter, encode/decode, JWT decoder, text hash, regex tester, color tools, converters, APK analyzer
-- Privacy: password generator
-- Originals are never touched: results are saved next to them
-
-**Vault**
-- Lock private files with a password (PBKDF2 + AES-256-GCM, encrypted on the device)
-- Locks itself when you leave the app. A forgotten password cannot be recovered
-
-**Trash and details**
-- Deleted files go to a trash you can restore from (Settings, then Trash), with Undo in Browse
-- Items are removed for good after 30 days
-- Details dialog for any file or folder: type, location, size and dates
-
-**Storage**
-- Usage bar split by file type, with file counts and sizes
-- Largest files list for quick cleanup
-
-**Design**
-- Orange and cream light theme and warm charcoal dark theme (Material 3)
-- Theme toggle: System, Light or Dark, saved between launches
-- Custom app icon (themed icon on Android 13+) and a splash screen for both themes
-
-**Planned**
-- Camera tools: QR scanner and generator, OCR, document scanner
-
-## App details
-
-| | |
-|---|---|
-| App name | Polo |
-| Package | `com.aos.polo` |
-| Platform | Android |
-| Framework | Flutter (Material 3) |
-| Made by | AlphaOmega Studio |
+## Where results are saved
+By default, edits stay next to the original file. Things made from scratch (scans, QR codes, text read from a picture) go to the `Polo` folder, in `Images`, `Documents`, `Scans`, `QR codes`, `Archives` or `Media`. You can change this in Settings.
 
 ## Permissions
+- **All files access** (`MANAGE_EXTERNAL_STORAGE`) on Android 11 and newer, or the standard storage permission on Android 10 and older. Needed to be a file manager.
+- **Camera**, only when you use the QR scanner, text from a picture, or the document scanner.
+- No internet permission.
 
-Polo asks for **All files access** (`MANAGE_EXTERNAL_STORAGE`) the first time you open it, because a file manager needs to see every folder. On Android 12 and older it uses the standard storage permission instead. Nothing leaves your device.
+## Privacy
+See [PRIVACY.md](PRIVACY.md). Polo works on your device only. Nothing is uploaded, and no personal data is collected.
 
-## Project structure
+## Build it
+1. Install Flutter and the Android toolchain.
+2. `flutter pub get`
+3. `flutter run` on an Android device or emulator
 
-```
-lib/
-  main.dart                      App entry point and theme wiring
-  models/
-    file_item.dart               File or folder data, type detection, size and date labels
-    storage_category.dart        File type groups used by the Storage screen
-  services/
-    file_service.dart            Listing, copy, move, rename, delete, new folder
-    trash_service.dart           Trash: move, restore, delete forever, 30-day clean-up
-    archive_service.dart         Create and extract ZIP files
-    convert_service.dart         Image conversion (background isolate)
-    pdf_service.dart             Images to PDF (background isolate)
-    duplicate_finder.dart        Finds identical files by size and content hash
-    storage_scanner.dart         Scans storage for the breakdown, largest, recent files and search index
-    storage_controller.dart      Shares scan results between screens
-    storage_info.dart            Total and free space, read through a platform channel
-    storage_access.dart          Storage permission helper
-    settings_controller.dart     Saved sort, hidden files and list/grid choice
-  theme/
-    app_theme.dart               Light and dark ThemeData
-    theme_controller.dart        Theme mode state, saved with shared_preferences
-  screens/
-    home_shell.dart              Navigation bar and top-level screens
-    home_screen.dart             Storage card, quick access, recent files
-    browse_screen.dart           Browsing, selection and file actions
-    search_screen.dart           Search with filters
-    category_screen.dart         All files of one type
-    tools_screen.dart            Tool cards and the zip menu
-    convert_images_screen.dart   Image converter
-    images_to_pdf_screen.dart    Images to PDF
-    duplicates_screen.dart       Duplicate finder
-    trash_screen.dart            Trash
-    pick_files_screen.dart       In-app file picker used by tools
-    storage_screen.dart          Breakdown and largest files
-    settings_screen.dart         Theme, browsing options, trash, about
-    about_screen.dart            Version, licenses and links
-  widgets/                       File tile, grid tile, dialogs, details, open-file helper
-  utils/format.dart              Size formatting
-assets/icon/                     App icon and splash images
-android/.../MainActivity.kt      Storage info platform channel
-```
+Some features use native Android code (video and audio conversion, PDF passwords, APK analysis, Open with). Use a full `flutter run`, not hot reload, after changing anything in `android/`.
 
-## Getting started
-
-Requirements: Flutter SDK, Android Studio (or the Android SDK) and an Android device or emulator.
-
-```bash
-git clone https://github.com/ashwithfrank/polo.git
-cd polo
-flutter pub get
-flutter run
-```
-
-To regenerate the launcher icon and splash screen after changing the images in `assets/icon/`:
-
-```bash
-dart run flutter_launcher_icons
-dart run flutter_native_splash:create
-```
-
-### Build troubleshooting (Windows)
-
-If the project is on a different drive from the Flutter pub cache, Gradle can fail with `this and base files have different roots`. Add this line to `android/gradle.properties`:
-
-```
-kotlin.incremental=false
-```
-
-Then run `flutter clean` and build again. Alternatively, set the `PUB_CACHE` environment variable to a folder on the same drive as the project.
-
-## Dependencies
-
-- [shared_preferences](https://pub.dev/packages/shared_preferences): saves theme and browsing choices
-- [permission_handler](https://pub.dev/packages/permission_handler): storage access
-- [open_filex](https://pub.dev/packages/open_filex): opens files in other apps
-- [share_plus](https://pub.dev/packages/share_plus): shares files
-- [image](https://pub.dev/packages/image): image conversion
-- [pdf](https://pub.dev/packages/pdf): builds PDFs
-- [archive](https://pub.dev/packages/archive): ZIP files
-- [crypto](https://pub.dev/packages/crypto): file hashing for the duplicate finder
-- [package_info_plus](https://pub.dev/packages/package_info_plus): app version in About
-- [flutter_launcher_icons](https://pub.dev/packages/flutter_launcher_icons) and [flutter_native_splash](https://pub.dev/packages/flutter_native_splash) (dev): icon and splash generation
-
-## Roadmap
-
-1. Theme, toggle and navigation shell (done)
-2. Storage permission and folder browsing (done)
-3. File actions: copy, move, rename, delete, share (done)
-4. App icon and splash screen (done)
-5. Home and Storage screens (done)
-6. Tools: image converter, images to PDF, zip and unzip (done)
-7. Search, categories, thumbnails (done)
-8. Trash, file details, duplicate finder, grid view (done)
-9. Video to audio, WebP output
-10. Release prep: signing, store listing
+## Credits
+Built with Flutter and a handful of open-source packages, including pdfrx, Google ML Kit (text recognition and document scanner), AndroidX Media3 and PdfBox-Android.
 
 ## License
-
-MIT. See the [LICENSE](LICENSE) file.
+See [LICENSE](LICENSE).
